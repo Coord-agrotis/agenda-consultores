@@ -2,7 +2,7 @@ const STORAGE_KEY = "agenda-consultores-data";
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { consultores: [], empresas: [], allocations: {} };
+  if (!raw) return { consultores: [], empresas: [], allocations: {}, ferias: {} };
   const data = JSON.parse(raw);
   if (data.clientes && !data.empresas) {
     data.empresas = data.clientes;
@@ -19,6 +19,7 @@ function loadData() {
     });
   }
   if (!data.empresas) data.empresas = [];
+  if (!data.ferias) data.ferias = {};
   return data;
 }
 
@@ -61,12 +62,87 @@ function formatWeekLabel(start) {
   return `${fmt(start)} - ${fmt(end)} (${weekKey(start)})`;
 }
 
+// --- Ferias helpers ---
+const MS_DAY = 24 * 3600 * 1000;
+const DIREITO_DIAS = 30;
+
+function parseDate(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function dateToStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function addYears(date, years) {
+  const d = new Date(date);
+  d.setFullYear(d.getFullYear() + years);
+  return d;
+}
+
+function diasEntre(inicio, fim) {
+  return Math.round((fim - inicio) / MS_DAY) + 1;
+}
+
+function getCicloAtual(dataBaseStr, refDate) {
+  const base = parseDate(dataBaseStr);
+  let n = refDate.getFullYear() - base.getFullYear();
+  let cicloInicio = addYears(base, n);
+  if (cicloInicio > refDate) {
+    n -= 1;
+    cicloInicio = addYears(base, n);
+  }
+  let cicloFim = new Date(addYears(base, n + 1) - MS_DAY);
+  while (cicloFim < refDate) {
+    n += 1;
+    cicloInicio = addYears(base, n);
+    cicloFim = new Date(addYears(base, n + 1) - MS_DAY);
+  }
+  return { inicio: cicloInicio, fim: cicloFim };
+}
+
+function getFeriasConsultor(consultor) {
+  if (!state.ferias[consultor]) state.ferias[consultor] = { dataBase: null, periodos: [] };
+  return state.ferias[consultor];
+}
+
+function calcularSaldo(consultor, refDate) {
+  const info = getFeriasConsultor(consultor);
+  if (!info.dataBase) return null;
+  const ciclo = getCicloAtual(info.dataBase, refDate);
+  let usados = 0;
+  info.periodos.forEach((p) => {
+    const pIni = parseDate(p.inicio);
+    const pFim = parseDate(p.fim);
+    const overlapIni = pIni > ciclo.inicio ? pIni : ciclo.inicio;
+    const overlapFim = pFim < ciclo.fim ? pFim : ciclo.fim;
+    if (overlapFim >= overlapIni) usados += diasEntre(overlapIni, overlapFim);
+  });
+  return { ciclo, usados, saldo: DIREITO_DIAS - usados };
+}
+
+function isConsultorDeFeriasNaSemana(consultor, weekStart) {
+  const info = getFeriasConsultor(consultor);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  return info.periodos.some((p) => {
+    const pIni = parseDate(p.inicio);
+    const pFim = parseDate(p.fim);
+    return pIni <= weekEnd && pFim >= weekStart;
+  });
+}
+
 // --- Rendering ---
 function render() {
   document.getElementById("weekLabel").textContent = formatWeekLabel(currentWeekStart);
   renderChipList("consultorList", state.consultores, removeConsultor);
   renderChipList("empresaList", state.empresas, removeEmpresa);
   renderSchedule();
+  renderFerias();
   saveData();
 }
 
@@ -105,6 +181,17 @@ function renderSchedule() {
     tdName.textContent = consultor;
 
     const tdAlloc = document.createElement("td");
+
+    if (isConsultorDeFeriasNaSemana(consultor, currentWeekStart)) {
+      const tag = document.createElement("span");
+      tag.className = "alloc-tag ferias";
+      tag.textContent = "FERIAS";
+      tdAlloc.appendChild(tag);
+      tr.appendChild(tdName);
+      tr.appendChild(tdAlloc);
+      body.appendChild(tr);
+      return;
+    }
 
     const weekAllocs = state.allocations[key] || {};
     const consultorAllocs = weekAllocs[consultor] || [];
@@ -161,6 +248,95 @@ function renderSchedule() {
   });
 }
 
+function renderFerias() {
+  const container = document.getElementById("feriasContainer");
+  container.innerHTML = "";
+
+  if (state.consultores.length === 0) {
+    container.innerHTML = `<span class="empty-hint">Cadastre consultores na aba Cadastro para controlar ferias.</span>`;
+    return;
+  }
+
+  state.consultores.forEach((consultor) => {
+    const info = getFeriasConsultor(consultor);
+    const card = document.createElement("div");
+    card.className = "ferias-card";
+
+    const title = document.createElement("h3");
+    title.textContent = consultor;
+    card.appendChild(title);
+
+    const baseRow = document.createElement("div");
+    baseRow.className = "data-base-row";
+    const baseLabel = document.createElement("span");
+    baseLabel.textContent = "Data base:";
+    const baseInput = document.createElement("input");
+    baseInput.type = "date";
+    if (info.dataBase) baseInput.value = info.dataBase;
+    baseInput.onchange = () => setDataBase(consultor, baseInput.value);
+    baseRow.appendChild(baseLabel);
+    baseRow.appendChild(baseInput);
+    card.appendChild(baseRow);
+
+    if (info.dataBase) {
+      const saldoInfo = calcularSaldo(consultor, new Date());
+      const saldoBox = document.createElement("div");
+      saldoBox.className = "saldo-box";
+      const fmt = (d) => d.toLocaleDateString("pt-BR");
+      saldoBox.innerHTML = `
+        <span class="pill">Periodo atual: ${fmt(saldoInfo.ciclo.inicio)} a ${fmt(saldoInfo.ciclo.fim)}</span>
+        <span class="pill">Dias utilizados: ${saldoInfo.usados}</span>
+        <span class="pill ${saldoInfo.saldo <= 0 ? "alert" : ""}">Saldo: ${saldoInfo.saldo} dias</span>
+      `;
+      card.appendChild(saldoBox);
+    } else {
+      const hint = document.createElement("div");
+      hint.className = "empty-hint";
+      hint.textContent = "Defina a data base para calcular o saldo de ferias.";
+      card.appendChild(hint);
+    }
+
+    const periodoForm = document.createElement("div");
+    periodoForm.className = "setup-row";
+    const inicioInput = document.createElement("input");
+    inicioInput.type = "date";
+    const fimInput = document.createElement("input");
+    fimInput.type = "date";
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "Registrar ferias";
+    addBtn.onclick = () => {
+      if (!inicioInput.value || !fimInput.value) return;
+      addPeriodoFerias(consultor, inicioInput.value, fimInput.value);
+    };
+    periodoForm.appendChild(inicioInput);
+    periodoForm.appendChild(fimInput);
+    periodoForm.appendChild(addBtn);
+    card.appendChild(periodoForm);
+
+    const list = document.createElement("ul");
+    list.className = "periodo-list";
+    if (info.periodos.length === 0) {
+      list.innerHTML = `<li class="empty-hint">Nenhum periodo de ferias registrado.</li>`;
+    } else {
+      info.periodos.forEach((p, idx) => {
+        const li = document.createElement("li");
+        const dias = diasEntre(parseDate(p.inicio), parseDate(p.fim));
+        const span = document.createElement("span");
+        span.textContent = `${parseDate(p.inicio).toLocaleDateString("pt-BR")} a ${parseDate(p.fim).toLocaleDateString("pt-BR")} (${dias} dias)`;
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "Remover";
+        removeBtn.onclick = () => removePeriodoFerias(consultor, idx);
+        li.appendChild(span);
+        li.appendChild(removeBtn);
+        list.appendChild(li);
+      });
+    }
+    card.appendChild(list);
+
+    container.appendChild(card);
+  });
+}
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
@@ -178,6 +354,7 @@ function addConsultor(name) {
 function removeConsultor(name) {
   state.consultores = state.consultores.filter((c) => c !== name);
   Object.values(state.allocations).forEach((week) => delete week[name]);
+  delete state.ferias[name];
   render();
 }
 
@@ -207,6 +384,22 @@ function addAllocation(weekKeyStr, consultor, empresa, modalidade) {
 
 function removeAllocation(weekKeyStr, consultor, idx) {
   state.allocations[weekKeyStr][consultor].splice(idx, 1);
+  render();
+}
+
+function setDataBase(consultor, dataBase) {
+  getFeriasConsultor(consultor).dataBase = dataBase;
+  render();
+}
+
+function addPeriodoFerias(consultor, inicio, fim) {
+  if (parseDate(fim) < parseDate(inicio)) return;
+  getFeriasConsultor(consultor).periodos.push({ inicio, fim });
+  render();
+}
+
+function removePeriodoFerias(consultor, idx) {
+  getFeriasConsultor(consultor).periodos.splice(idx, 1);
   render();
 }
 

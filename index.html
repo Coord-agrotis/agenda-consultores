@@ -208,6 +208,63 @@
   }
   .tab-panel { display: none; }
   .tab-panel.active { display: grid; gap: 20px; }
+  .alloc-tag.ferias { background: #fee2e2; color: var(--danger); font-weight: 700; }
+  .ferias-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .ferias-card h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+  }
+  .saldo-box {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin: 8px 0 12px;
+    font-size: 13px;
+  }
+  .saldo-box .pill {
+    background: var(--accent-light);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+  .saldo-box .pill.alert { background: #fee2e2; color: var(--danger); }
+  .periodo-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 13px;
+  }
+  .periodo-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .periodo-list li button {
+    border: none;
+    background: none;
+    color: var(--danger);
+    cursor: pointer;
+  }
+  .data-base-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .data-base-row input[type="date"] {
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
 </style>
 </head>
 <body>
@@ -224,6 +281,7 @@
 <nav class="tabs">
   <button class="tab-button active" data-tab="agendas">Agendas</button>
   <button class="tab-button" data-tab="cadastro">Cadastro</button>
+  <button class="tab-button" data-tab="ferias">Ferias</button>
 </nav>
 
 <main>
@@ -256,6 +314,13 @@
         <button id="addEmpresa">Adicionar</button>
       </div>
       <div class="chip-list" id="empresaList"></div>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-ferias">
+    <div class="card">
+      <h2>Controle de ferias</h2>
+      <div id="feriasContainer"></div>
     </div>
   </section>
 </main>
