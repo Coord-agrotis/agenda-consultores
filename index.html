@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda de Consultores</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --border: #e0e2e6;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --presencial: #047857;
+    --presencial-bg: #d1fae5;
+    --remoto: #b45309;
+    --remoto-bg: #fef3c7;
+    --danger: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 18px;
+    margin: 0;
+  }
+  .week-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .week-nav button {
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .week-nav button:hover { background: var(--accent-light); }
+  .week-label {
+    font-weight: 600;
+    min-width: 220px;
+    text-align: center;
+  }
+  main {
+    max-width: 1100px;
+    margin: 24px auto;
+    padding: 0 16px;
+    display: grid;
+    gap: 20px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .setup-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .setup-row input {
+    flex: 1;
+    min-width: 160px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .setup-row button {
+    padding: 8px 14px;
+    border: none;
+    background: var(--accent);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .setup-row button:hover { background: #1d4ed8; }
+  .chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+  .chip button {
+    border: none;
+    background: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #fafbfc;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .alloc-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+    padding: 3px 8px;
+    margin: 2px 4px 2px 0;
+    font-size: 13px;
+  }
+  .alloc-tag.presencial { background: var(--presencial-bg); color: var(--presencial); }
+  .alloc-tag.remoto { background: var(--remoto-bg); color: var(--remoto); }
+  .alloc-tag button {
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+    font-weight: bold;
+    padding: 0;
+  }
+  .add-alloc-form {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+  .add-alloc-form select, .add-alloc-form button {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .add-alloc-form button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  .empty-hint {
+    color: var(--muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Agenda de Consultores</h1>
+  <div class="week-nav">
+    <button id="prevWeek">&larr;</button>
+    <div class="week-label" id="weekLabel"></div>
+    <button id="nextWeek">&rarr;</button>
+    <button id="todayWeek">Semana atual</button>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Consultores</h2>
+    <div class="setup-row">
+      <input id="newConsultor" type="text" placeholder="Nome do consultor">
+      <button id="addConsultor">Adicionar</button>
+    </div>
+    <div class="chip-list" id="consultorList"></div>
+  </section>
+
+  <section class="card">
+    <h2>Clientes</h2>
+    <div class="setup-row">
+      <input id="newCliente" type="text" placeholder="Nome do cliente">
+      <button id="addCliente">Adicionar</button>
+    </div>
+    <div class="chip-list" id="clienteList"></div>
+  </section>
+
+  <section class="card">
+    <h2>Alocacao da semana</h2>
+    <table id="scheduleTable">
+      <thead>
+        <tr><th style="width:200px;">Consultor</th><th>Alocacoes (cliente / modalidade)</th></tr>
+      </thead>
+      <tbody id="scheduleBody"></tbody>
+    </table>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
