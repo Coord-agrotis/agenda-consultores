@@ -540,6 +540,26 @@ function removeAllocation(weekKeyStr, consultor, idx) {
   render();
 }
 
+function replicarSemanaAtual(numSemanas) {
+  const origemKey = weekKey(currentWeekStart);
+  const origemAllocs = state.allocations[origemKey] || {};
+
+  for (let i = 1; i <= numSemanas; i++) {
+    const destinoStart = new Date(currentWeekStart);
+    destinoStart.setDate(destinoStart.getDate() + i * 7);
+    const destinoKey = weekKey(destinoStart);
+
+    state.consultores.forEach((consultor) => {
+      if (isConsultorDeFeriasNaSemana(consultor, destinoStart)) return;
+      const allocs = origemAllocs[consultor];
+      if (!allocs || allocs.length === 0) return;
+      if (!state.allocations[destinoKey]) state.allocations[destinoKey] = {};
+      state.allocations[destinoKey][consultor] = allocs.map((a) => ({ ...a }));
+    });
+  }
+  render();
+}
+
 function setDataBase(consultor, dataBase) {
   getFeriasConsultor(consultor).dataBase = dataBase;
   render();
@@ -634,6 +654,11 @@ document.getElementById("nextWeek").onclick = () => {
 document.getElementById("todayWeek").onclick = () => {
   currentWeekStart = getStartOfWeek(new Date());
   render();
+};
+
+document.getElementById("replicarBtn").onclick = () => {
+  const n = Math.max(1, Math.min(26, parseInt(document.getElementById("replicarWeeks").value, 10) || 1));
+  replicarSemanaAtual(n);
 };
 
 document.getElementById("viewSemana").onclick = () => setView("semana");

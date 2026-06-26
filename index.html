@@ -400,6 +400,12 @@
 
       <div id="semanaView">
         <h2>Alocacao da semana</h2>
+        <div class="setup-row" style="align-items:center;">
+          <label for="replicarWeeks" class="empty-hint">Replicar esta semana para as proximas</label>
+          <input id="replicarWeeks" type="number" min="1" max="26" value="1" style="max-width:70px; flex:none;">
+          <label for="replicarWeeks" class="empty-hint">semana(s)</label>
+          <button id="replicarBtn">Replicar</button>
+        </div>
         <table id="scheduleTable">
           <thead>
             <tr><th style="width:200px;">Consultor</th><th>Alocacoes (empresa / modalidade)</th></tr>
