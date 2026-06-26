@@ -438,6 +438,56 @@ function setView(mode) {
   render();
 }
 
+function renderCiclosBox(box, consultor) {
+  const info = getFeriasConsultor(consultor);
+  box.innerHTML = "";
+
+  if (!info.dataBase) {
+    const hint = document.createElement("div");
+    hint.className = "empty-hint";
+    hint.textContent = "Defina a data base para calcular o saldo de ferias.";
+    box.appendChild(hint);
+    return;
+  }
+
+  const fmt = (d) => d.toLocaleDateString("pt-BR");
+  const ciclos = getCiclosConsultor(consultor);
+  const table = document.createElement("table");
+  table.className = "ciclos-table";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Periodo</th><th>Inicio</th><th>Fim</th><th>Dias usados</th><th>Saldo</th><th>Status</th><th>Alerta</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${ciclos
+        .map((c) => {
+          const pct = Math.min(100, Math.round((c.usados / DIREITO_DIAS) * 100));
+          const barColor = c.saldo <= 0 ? "var(--danger)" : c.saldo <= 5 ? "#92400e" : "var(--presencial)";
+          return `
+            <tr>
+              <td>${c.num}${c.status === "atual" ? " &middot; atual" : ""}</td>
+              <td>${fmt(c.inicio)}</td>
+              <td>${fmt(c.fim)}</td>
+              <td>${c.usados}</td>
+              <td>
+                <div class="saldo-bar-wrap">
+                  <div class="saldo-bar-track"><div class="saldo-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+                  <span>${c.saldo}</span>
+                </div>
+              </td>
+              <td><span class="status-chip ${c.status}">${c.status}</span></td>
+              <td><span class="alert-pill ${c.alerta.nivel}">${c.alerta.texto}</span></td>
+            </tr>
+          `;
+        })
+        .join("")}
+    </tbody>
+  `;
+  box.appendChild(table);
+}
+
 function renderFerias() {
   const container = document.getElementById("feriasContainer");
   container.innerHTML = "";
@@ -468,49 +518,10 @@ function renderFerias() {
     baseRow.appendChild(baseInput);
     card.appendChild(baseRow);
 
-    if (info.dataBase) {
-      const fmt = (d) => d.toLocaleDateString("pt-BR");
-      const ciclos = getCiclosConsultor(consultor);
-      const table = document.createElement("table");
-      table.className = "ciclos-table";
-      table.innerHTML = `
-        <thead>
-          <tr>
-            <th>Periodo</th><th>Inicio</th><th>Fim</th><th>Dias usados</th><th>Saldo</th><th>Status</th><th>Alerta</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${ciclos
-            .map((c) => {
-              const pct = Math.min(100, Math.round((c.usados / DIREITO_DIAS) * 100));
-              const barColor = c.saldo <= 0 ? "var(--danger)" : c.saldo <= 5 ? "#92400e" : "var(--presencial)";
-              return `
-                <tr>
-                  <td>${c.num}${c.status === "atual" ? " &middot; atual" : ""}</td>
-                  <td>${fmt(c.inicio)}</td>
-                  <td>${fmt(c.fim)}</td>
-                  <td>${c.usados}</td>
-                  <td>
-                    <div class="saldo-bar-wrap">
-                      <div class="saldo-bar-track"><div class="saldo-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
-                      <span>${c.saldo}</span>
-                    </div>
-                  </td>
-                  <td><span class="status-chip ${c.status}">${c.status}</span></td>
-                  <td><span class="alert-pill ${c.alerta.nivel}">${c.alerta.texto}</span></td>
-                </tr>
-              `;
-            })
-            .join("")}
-        </tbody>
-      `;
-      card.appendChild(table);
-    } else {
-      const hint = document.createElement("div");
-      hint.className = "empty-hint";
-      hint.textContent = "Defina a data base para calcular o saldo de ferias.";
-      card.appendChild(hint);
-    }
+    const ciclosBox = document.createElement("div");
+    ciclosBox.dataset.ciclosFor = consultor;
+    renderCiclosBox(ciclosBox, consultor);
+    card.appendChild(ciclosBox);
 
     const periodoForm = document.createElement("div");
     periodoForm.className = "setup-row";
@@ -642,7 +653,9 @@ function replicarSemanaAtual(numSemanas) {
 
 function setDataBase(consultor, dataBase) {
   getFeriasConsultor(consultor).dataBase = dataBase;
-  render();
+  saveData();
+  const box = document.querySelector(`[data-ciclos-for="${CSS.escape(consultor)}"]`);
+  if (box) renderCiclosBox(box, consultor);
 }
 
 function addPeriodoFerias(consultor, inicio, fim) {
