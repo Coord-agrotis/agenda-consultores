@@ -220,12 +220,18 @@ function renderSchedule() {
       form.className = "add-alloc-form";
 
       const empresaSelect = document.createElement("select");
+      empresaSelect.multiple = true;
+      empresaSelect.size = Math.min(state.empresas.length, 5);
       state.empresas.forEach((e) => {
         const opt = document.createElement("option");
         opt.value = e;
         opt.textContent = e;
         empresaSelect.appendChild(opt);
       });
+
+      const hint = document.createElement("div");
+      hint.className = "empty-hint";
+      hint.textContent = "Ctrl/Cmd + clique para selecionar varias empresas";
 
       const modalidadeSelect = document.createElement("select");
       ["presencial", "remoto"].forEach((m) => {
@@ -237,9 +243,13 @@ function renderSchedule() {
 
       const addBtn = document.createElement("button");
       addBtn.textContent = "Alocar";
-      addBtn.onclick = () => addAllocation(key, consultor, empresaSelect.value, modalidadeSelect.value);
+      addBtn.onclick = () => {
+        const selecionadas = Array.from(empresaSelect.selectedOptions).map((o) => o.value);
+        addAllocacoes(key, consultor, selecionadas, modalidadeSelect.value);
+      };
 
       form.appendChild(empresaSelect);
+      form.appendChild(hint);
       form.appendChild(modalidadeSelect);
       form.appendChild(addBtn);
       tdAlloc.appendChild(form);
@@ -370,6 +380,8 @@ function renderPeriodo() {
         form.className = "add-alloc-form periodo-cell-form";
 
         const empresaSelect = document.createElement("select");
+        empresaSelect.multiple = true;
+        empresaSelect.size = Math.min(state.empresas.length, 4);
         state.empresas.forEach((e) => {
           const opt = document.createElement("option");
           opt.value = e;
@@ -387,8 +399,11 @@ function renderPeriodo() {
 
         const addBtn = document.createElement("button");
         addBtn.textContent = "+";
-        addBtn.title = "Alocar nesta semana";
-        addBtn.onclick = () => addAllocation(key, consultor, empresaSelect.value, modalidadeSelect.value);
+        addBtn.title = "Alocar nesta semana (Ctrl/Cmd + clique para varias empresas)";
+        addBtn.onclick = () => {
+          const selecionadas = Array.from(empresaSelect.selectedOptions).map((o) => o.value);
+          addAllocacoes(key, consultor, selecionadas, modalidadeSelect.value);
+        };
 
         form.appendChild(empresaSelect);
         form.appendChild(modalidadeSelect);
@@ -573,10 +588,13 @@ function removeEmpresa(name) {
   render();
 }
 
-function addAllocation(weekKeyStr, consultor, empresa, modalidade) {
+function addAllocacoes(weekKeyStr, consultor, empresas, modalidade) {
+  if (empresas.length === 0) return;
   if (!state.allocations[weekKeyStr]) state.allocations[weekKeyStr] = {};
   if (!state.allocations[weekKeyStr][consultor]) state.allocations[weekKeyStr][consultor] = [];
-  state.allocations[weekKeyStr][consultor].push({ empresa, modalidade });
+  empresas.forEach((empresa) => {
+    state.allocations[weekKeyStr][consultor].push({ empresa, modalidade });
+  });
   render();
 }
 
