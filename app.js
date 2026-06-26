@@ -158,7 +158,8 @@ function renderAllocControl(container, weekKeyStr, consultor, compact) {
   if (!openAllocForms.has(fk)) {
     const btn = document.createElement("button");
     btn.className = "add-agenda-btn";
-    btn.textContent = compact ? "+ Agenda" : "+ Adicionar agenda";
+    btn.textContent = "+";
+    btn.title = "Adicionar agenda";
     btn.onclick = () => {
       openAllocForms.add(fk);
       render();
