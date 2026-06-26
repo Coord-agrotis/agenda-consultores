@@ -6,25 +6,30 @@
 <title>Agenda de Consultores</title>
 <style>
   :root {
-    --bg: #f4f5f7;
+    --bg: #f1f3f7;
     --card: #ffffff;
-    --border: #e0e2e6;
-    --text: #1f2430;
+    --border: #e4e7ec;
+    --border2: #d6dae3;
+    --text: #161b26;
     --muted: #6b7280;
-    --accent: #2563eb;
-    --accent-light: #dbeafe;
+    --accent: #4f46e5;
+    --accent-dark: #4338ca;
+    --accent-light: #eef0fe;
     --presencial: #047857;
     --presencial-bg: #d1fae5;
     --remoto: #b45309;
     --remoto-bg: #fef3c7;
     --danger: #dc2626;
+    --danger-bg: #fee2e2;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-family: "Segoe UI", -apple-system, Roboto, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
+    -webkit-font-smoothing: antialiased;
   }
   header {
     background: var(--card);
@@ -35,10 +40,15 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
   header h1 {
     font-size: 18px;
     margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
   .week-nav {
     display: flex;
@@ -48,36 +58,39 @@
   .week-nav button {
     border: 1px solid var(--border);
     background: var(--card);
-    border-radius: 6px;
-    padding: 6px 10px;
+    border-radius: 8px;
+    padding: 6px 12px;
     cursor: pointer;
     font-size: 14px;
+    transition: background 0.15s, border-color 0.15s;
   }
-  .week-nav button:hover { background: var(--accent-light); }
+  .week-nav button:hover { background: var(--accent-light); border-color: var(--accent); }
   .week-label {
     font-weight: 600;
     min-width: 220px;
     text-align: center;
   }
   main {
-    max-width: 1100px;
+    max-width: 1180px;
     margin: 24px auto;
-    padding: 0 16px;
+    padding: 0 16px 48px;
     display: grid;
     gap: 20px;
   }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px 20px;
+    border-radius: 12px;
+    padding: 18px 22px;
+    box-shadow: var(--shadow);
   }
   .card h2 {
-    font-size: 15px;
-    margin: 0 0 12px;
+    font-size: 13px;
+    margin: 0 0 14px;
     color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
+    font-weight: 700;
   }
   .setup-row {
     display: flex;
@@ -94,15 +107,17 @@
     font-size: 14px;
   }
   .setup-row button {
-    padding: 8px 14px;
+    padding: 8px 16px;
     border: none;
     background: var(--accent);
     color: white;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
+    font-weight: 600;
+    transition: background 0.15s;
   }
-  .setup-row button:hover { background: #1d4ed8; }
+  .setup-row button:hover { background: var(--accent-dark); }
   .chip-list {
     display: flex;
     flex-wrap: wrap;
@@ -114,9 +129,10 @@
     gap: 6px;
     background: var(--accent-light);
     color: var(--accent);
-    padding: 4px 10px;
+    padding: 5px 12px;
     border-radius: 999px;
     font-size: 13px;
+    font-weight: 600;
   }
   .chip button {
     border: none;
@@ -134,15 +150,19 @@
   }
   th, td {
     border: 1px solid var(--border);
-    padding: 8px 10px;
+    padding: 9px 12px;
     text-align: left;
     vertical-align: top;
   }
   th {
-    background: #fafbfc;
-    font-weight: 600;
+    background: #f8f9fb;
+    font-weight: 700;
     color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
+  tbody tr:hover { background: #fafbfd; }
   .alloc-tag {
     display: inline-flex;
     align-items: center;
@@ -205,32 +225,34 @@
   .tabs {
     display: flex;
     gap: 4px;
-    max-width: 1100px;
-    margin: 16px auto 0;
+    max-width: 1180px;
+    margin: 18px auto 0;
     padding: 0 16px;
   }
   .tab-button {
-    border: 1px solid var(--border);
-    border-bottom: none;
-    background: var(--bg);
+    border: none;
+    background: none;
     color: var(--muted);
     padding: 10px 18px;
-    border-radius: 8px 8px 0 0;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 600;
+    transition: background 0.15s, color 0.15s;
   }
+  .tab-button:hover { background: #e9ebf3; color: var(--text); }
   .tab-button.active {
-    background: var(--card);
-    color: var(--text);
+    background: var(--accent);
+    color: white;
   }
+  .tab-button.active:hover { background: var(--accent); }
   .tab-panel { display: none; }
   .tab-panel.active { display: grid; gap: 20px; }
-  .alloc-tag.ferias { background: #fee2e2; color: var(--danger); font-weight: 700; }
+  .alloc-tag.ferias { background: var(--danger-bg); color: var(--danger); font-weight: 700; }
   .ferias-card {
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
+    border-radius: 10px;
+    padding: 14px 16px;
     margin-bottom: 12px;
   }
   .ferias-card h3 {
@@ -341,25 +363,63 @@
   .periodo-replicar-btn:hover { background: var(--accent); color: white; }
   .sum-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 10px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
   }
   .sum-card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 14px;
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow);
   }
+  .sum-card.warn { border-left-color: #d97706; }
+  .sum-card.danger { border-left-color: var(--danger); }
+  .sum-card.ok { border-left-color: var(--presencial); }
   .sum-card .sum-lbl {
     font-size: 11px;
     color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
+    font-weight: 600;
   }
   .sum-card .sum-val {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-top: 2px;
+  }
+  .dash-section {
+    margin-top: 4px;
+  }
+  .dash-alert-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .dash-alert-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .dash-alert-list li:last-child { border-bottom: none; }
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .filter-row select {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    min-width: 200px;
   }
   .ciclos-table {
     width: 100%;
@@ -424,16 +484,31 @@
 </header>
 
 <nav class="tabs">
-  <button class="tab-button active" data-tab="agendas">Agendas</button>
+  <button class="tab-button active" data-tab="dashboard">Dashboard</button>
+  <button class="tab-button" data-tab="agendas">Agendas</button>
   <button class="tab-button" data-tab="cadastro">Cadastro</button>
   <button class="tab-button" data-tab="ferias">Ferias</button>
 </nav>
 
 <main>
-  <section class="tab-panel active" id="tab-agendas">
+  <section class="tab-panel active" id="tab-dashboard">
+    <div class="sum-grid" id="dashboardCards"></div>
+
+    <div class="card dash-section">
+      <h2>Alertas de ferias</h2>
+      <ul class="dash-alert-list" id="dashboardAlertas"></ul>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-agendas">
     <div class="sum-grid" id="sumCards"></div>
 
     <div class="card">
+      <div class="filter-row">
+        <label for="filtroConsultor" class="empty-hint">Filtrar por consultor:</label>
+        <select id="filtroConsultor"><option value="todos">Todos os consultores</option></select>
+      </div>
+
       <div class="view-toggle">
         <button id="viewSemana" class="active" data-view="semana">Semana</button>
         <button id="viewPeriodo" data-view="periodo">Periodo</button>
@@ -503,6 +578,8 @@
   </section>
 
   <section class="tab-panel" id="tab-ferias">
+    <div class="sum-grid" id="feriasSumCards"></div>
+
     <div class="card">
       <h2>Controle de ferias</h2>
       <div id="feriasContainer"></div>

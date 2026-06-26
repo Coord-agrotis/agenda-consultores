@@ -32,6 +32,7 @@ const state = loadData();
 // --- Week handling (ISO week, key = "YYYY-WW") ---
 let currentWeekStart = getStartOfWeek(new Date());
 let viewMode = "semana";
+let filtroConsultorAtual = "todos";
 
 function getStartOfWeek(date) {
   const d = new Date(date);
@@ -138,6 +139,22 @@ function isConsultorDeFeriasNaSemana(consultor, weekStart) {
   });
 }
 
+function isConsultorDeFeriasHoje(consultor) {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const info = getFeriasConsultor(consultor);
+  return info.periodos.some((p) => {
+    const pIni = parseDate(p.inicio);
+    const pFim = parseDate(p.fim);
+    return pIni <= hoje && pFim >= hoje;
+  });
+}
+
+function getConsultoresFiltrados() {
+  if (filtroConsultorAtual === "todos") return state.consultores;
+  return state.consultores.filter((c) => c === filtroConsultorAtual);
+}
+
 // --- Alloc form toggle state ---
 const openAllocForms = new Set();
 function formKey(weekKeyStr, consultor) {
@@ -223,6 +240,7 @@ function render() {
   document.getElementById("weekLabel").textContent = formatWeekLabel(currentWeekStart);
   renderChipList("consultorList", state.consultores, removeConsultor);
   renderChipList("empresaList", state.empresas, removeEmpresa);
+  renderFiltroConsultor();
   if (viewMode === "semana") {
     renderSchedule();
     renderResumoSemana();
@@ -231,7 +249,28 @@ function render() {
     document.getElementById("sumCards").innerHTML = "";
   }
   renderFerias();
+  renderFeriasResumo();
+  renderDashboard();
   saveData();
+}
+
+function renderFiltroConsultor() {
+  const select = document.getElementById("filtroConsultor");
+  const valorAtual = select.value || filtroConsultorAtual;
+  select.innerHTML = `<option value="todos">Todos os consultores</option>`;
+  state.consultores.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    select.appendChild(opt);
+  });
+  if (state.consultores.includes(valorAtual) || valorAtual === "todos") {
+    select.value = valorAtual;
+    filtroConsultorAtual = valorAtual;
+  } else {
+    select.value = "todos";
+    filtroConsultorAtual = "todos";
+  }
 }
 
 function renderChipList(containerId, items, onRemove) {
@@ -258,12 +297,14 @@ function renderSchedule() {
   const body = document.getElementById("scheduleBody");
   body.innerHTML = "";
 
-  if (state.consultores.length === 0) {
-    body.innerHTML = `<tr><td colspan="2" class="empty-hint">Cadastre consultores para comecar.</td></tr>`;
+  const consultores = getConsultoresFiltrados();
+
+  if (consultores.length === 0) {
+    body.innerHTML = `<tr><td colspan="2" class="empty-hint">${state.consultores.length === 0 ? "Cadastre consultores para comecar." : "Nenhum consultor encontrado com o filtro selecionado."}</td></tr>`;
     return;
   }
 
-  state.consultores.forEach((consultor) => {
+  consultores.forEach((consultor) => {
     const tr = document.createElement("tr");
     const tdName = document.createElement("td");
     tdName.textContent = consultor;
@@ -313,7 +354,7 @@ function renderResumoSemana() {
   let emFerias = 0;
   const empresasNaSemana = new Set();
 
-  state.consultores.forEach((consultor) => {
+  getConsultoresFiltrados().forEach((consultor) => {
     if (isConsultorDeFeriasNaSemana(consultor, currentWeekStart)) {
       emFerias++;
       return;
@@ -374,12 +415,14 @@ function renderPeriodo() {
     head.appendChild(th);
   });
 
-  if (state.consultores.length === 0) {
-    body.innerHTML = `<tr><td colspan="${numWeeks + 1}" class="empty-hint">Cadastre consultores para comecar.</td></tr>`;
+  const consultores = getConsultoresFiltrados();
+
+  if (consultores.length === 0) {
+    body.innerHTML = `<tr><td colspan="${numWeeks + 1}" class="empty-hint">${state.consultores.length === 0 ? "Cadastre consultores para comecar." : "Nenhum consultor encontrado com o filtro selecionado."}</td></tr>`;
     return;
   }
 
-  state.consultores.forEach((consultor) => {
+  consultores.forEach((consultor) => {
     const tr = document.createElement("tr");
     const tdName = document.createElement("td");
     tdName.textContent = consultor;
@@ -486,6 +529,96 @@ function renderCiclosBox(box, consultor) {
     </tbody>
   `;
   box.appendChild(table);
+}
+
+function getAlertaAtual(consultor) {
+  const ciclos = getCiclosConsultor(consultor);
+  return ciclos.find((c) => c.status === "atual") || null;
+}
+
+function renderFeriasResumo() {
+  const container = document.getElementById("feriasSumCards");
+  if (!container) return;
+
+  let emFeriasHoje = 0;
+  let semDataBase = 0;
+  let saldoCritico = 0;
+  let diasVencidos = 0;
+
+  state.consultores.forEach((consultor) => {
+    if (isConsultorDeFeriasHoje(consultor)) emFeriasHoje++;
+    const info = getFeriasConsultor(consultor);
+    if (!info.dataBase) {
+      semDataBase++;
+      return;
+    }
+    getCiclosConsultor(consultor).forEach((c) => {
+      if (c.status === "atual" && c.saldo <= 5) saldoCritico++;
+      if (c.status === "passado" && c.saldo > 0) diasVencidos += c.saldo;
+    });
+  });
+
+  const cards = [
+    { lbl: "Consultores", val: state.consultores.length },
+    { lbl: "Em ferias hoje", val: emFeriasHoje, cls: emFeriasHoje > 0 ? "warn" : "ok" },
+    { lbl: "Saldo critico (<=5 dias)", val: saldoCritico, cls: saldoCritico > 0 ? "danger" : "ok" },
+    { lbl: "Dias vencidos (total)", val: diasVencidos, cls: diasVencidos > 0 ? "danger" : "ok" },
+    { lbl: "Sem data base", val: semDataBase, cls: semDataBase > 0 ? "warn" : "ok" },
+  ];
+
+  container.innerHTML = cards
+    .map((c) => `<div class="sum-card ${c.cls || ""}"><div class="sum-lbl">${c.lbl}</div><div class="sum-val">${c.val}</div></div>`)
+    .join("");
+}
+
+function renderDashboard() {
+  const cardsContainer = document.getElementById("dashboardCards");
+  const alertasContainer = document.getElementById("dashboardAlertas");
+  if (!cardsContainer || !alertasContainer) return;
+
+  const hojeWeekStart = getStartOfWeek(new Date());
+  const hojeKey = weekKey(hojeWeekStart);
+  const hojeAllocs = state.allocations[hojeKey] || {};
+
+  let totalAlocacoesSemana = 0;
+  let emFeriasHoje = 0;
+  const empresasSemana = new Set();
+  const alertas = [];
+
+  state.consultores.forEach((consultor) => {
+    if (isConsultorDeFeriasHoje(consultor)) emFeriasHoje++;
+    if (!isConsultorDeFeriasNaSemana(consultor, hojeWeekStart)) {
+      (hojeAllocs[consultor] || []).forEach((alloc) => {
+        totalAlocacoesSemana++;
+        empresasSemana.add(alloc.empresa);
+      });
+    }
+    const alertaAtual = getAlertaAtual(consultor);
+    if (alertaAtual && (alertaAtual.alerta.nivel === "danger" || alertaAtual.alerta.nivel === "warn")) {
+      alertas.push({ consultor, texto: alertaAtual.alerta.texto, nivel: alertaAtual.alerta.nivel });
+    }
+  });
+
+  const cards = [
+    { lbl: "Total de consultores", val: state.consultores.length },
+    { lbl: "Empresas cadastradas", val: state.empresas.length },
+    { lbl: "Em ferias hoje", val: emFeriasHoje, cls: emFeriasHoje > 0 ? "warn" : "ok" },
+    { lbl: "Alocacoes (semana atual)", val: totalAlocacoesSemana },
+    { lbl: "Empresas atendidas (semana atual)", val: empresasSemana.size },
+    { lbl: "Alertas de ferias", val: alertas.length, cls: alertas.length > 0 ? "danger" : "ok" },
+  ];
+
+  cardsContainer.innerHTML = cards
+    .map((c) => `<div class="sum-card ${c.cls || ""}"><div class="sum-lbl">${c.lbl}</div><div class="sum-val">${c.val}</div></div>`)
+    .join("");
+
+  if (alertas.length === 0) {
+    alertasContainer.innerHTML = `<li class="empty-hint">Nenhum alerta de ferias no momento.</li>`;
+  } else {
+    alertasContainer.innerHTML = alertas
+      .map((a) => `<li><span>${escapeHtml(a.consultor)}</span><span class="alert-pill ${a.nivel}">${escapeHtml(a.texto)}</span></li>`)
+      .join("");
+  }
 }
 
 function renderFerias() {
@@ -656,6 +789,8 @@ function setDataBase(consultor, dataBase) {
   saveData();
   const box = document.querySelector(`[data-ciclos-for="${CSS.escape(consultor)}"]`);
   if (box) renderCiclosBox(box, consultor);
+  renderFeriasResumo();
+  renderDashboard();
 }
 
 function addPeriodoFerias(consultor, inicio, fim) {
@@ -753,6 +888,16 @@ document.getElementById("replicarBtn").onclick = () => {
   const n = Math.max(1, Math.min(26, parseInt(document.getElementById("replicarWeeks").value, 10) || 1));
   replicarSemanaAtual(n);
 };
+
+document.getElementById("filtroConsultor").addEventListener("change", (e) => {
+  filtroConsultorAtual = e.target.value;
+  if (viewMode === "semana") {
+    renderSchedule();
+    renderResumoSemana();
+  } else {
+    renderPeriodo();
+  }
+});
 
 document.getElementById("viewSemana").onclick = () => setView("semana");
 document.getElementById("viewPeriodo").onclick = () => setView("periodo");
