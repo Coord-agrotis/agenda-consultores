@@ -31,6 +31,7 @@ const state = loadData();
 
 // --- Week handling (ISO week, key = "YYYY-WW") ---
 let currentWeekStart = getStartOfWeek(new Date());
+let viewMode = "semana";
 
 function getStartOfWeek(date) {
   const d = new Date(date);
@@ -141,7 +142,11 @@ function render() {
   document.getElementById("weekLabel").textContent = formatWeekLabel(currentWeekStart);
   renderChipList("consultorList", state.consultores, removeConsultor);
   renderChipList("empresaList", state.empresas, removeEmpresa);
-  renderSchedule();
+  if (viewMode === "semana") {
+    renderSchedule();
+  } else {
+    renderPeriodo();
+  }
   renderFerias();
   saveData();
 }
@@ -246,6 +251,89 @@ function renderSchedule() {
     tr.appendChild(tdAlloc);
     body.appendChild(tr);
   });
+}
+
+function renderPeriodo() {
+  const head = document.getElementById("periodoHead");
+  const body = document.getElementById("periodoBody");
+  head.innerHTML = "";
+  body.innerHTML = "";
+
+  const numWeeks = Math.max(2, Math.min(26, parseInt(document.getElementById("periodoWeeks").value, 10) || 8));
+
+  const weekStarts = [];
+  for (let i = 0; i < numWeeks; i++) {
+    const ws = new Date(currentWeekStart);
+    ws.setDate(ws.getDate() + i * 7);
+    weekStarts.push(ws);
+  }
+
+  const thName = document.createElement("th");
+  thName.style.width = "180px";
+  thName.textContent = "Consultor";
+  head.appendChild(thName);
+
+  weekStarts.forEach((ws) => {
+    const th = document.createElement("th");
+    th.className = "week-col";
+    const end = new Date(ws);
+    end.setDate(end.getDate() + 6);
+    const fmt = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    th.textContent = `${fmt(ws)} a ${fmt(end)}`;
+    th.title = "Clique para abrir esta semana na visao Semanal";
+    th.onclick = () => {
+      currentWeekStart = getStartOfWeek(ws);
+      setView("semana");
+    };
+    head.appendChild(th);
+  });
+
+  if (state.consultores.length === 0) {
+    body.innerHTML = `<tr><td colspan="${numWeeks + 1}" class="empty-hint">Cadastre consultores para comecar.</td></tr>`;
+    return;
+  }
+
+  state.consultores.forEach((consultor) => {
+    const tr = document.createElement("tr");
+    const tdName = document.createElement("td");
+    tdName.textContent = consultor;
+    tr.appendChild(tdName);
+
+    weekStarts.forEach((ws) => {
+      const td = document.createElement("td");
+      if (isConsultorDeFeriasNaSemana(consultor, ws)) {
+        const tag = document.createElement("span");
+        tag.className = "alloc-tag ferias";
+        tag.textContent = "FERIAS";
+        td.appendChild(tag);
+      } else {
+        const key = weekKey(ws);
+        const allocs = (state.allocations[key] || {})[consultor] || [];
+        if (allocs.length === 0) {
+          td.innerHTML = `<span class="empty-hint">-</span>`;
+        } else {
+          allocs.forEach((alloc) => {
+            const tag = document.createElement("span");
+            tag.className = `alloc-tag ${alloc.modalidade}`;
+            tag.textContent = `${alloc.empresa} (${alloc.modalidade === "presencial" ? "Presencial" : "Remoto"})`;
+            td.appendChild(tag);
+          });
+        }
+      }
+      tr.appendChild(td);
+    });
+
+    body.appendChild(tr);
+  });
+}
+
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById("viewSemana").classList.toggle("active", mode === "semana");
+  document.getElementById("viewPeriodo").classList.toggle("active", mode === "periodo");
+  document.getElementById("semanaView").style.display = mode === "semana" ? "" : "none";
+  document.getElementById("periodoView").style.display = mode === "periodo" ? "" : "none";
+  render();
 }
 
 function renderFerias() {
@@ -435,6 +523,12 @@ document.getElementById("todayWeek").onclick = () => {
   currentWeekStart = getStartOfWeek(new Date());
   render();
 };
+
+document.getElementById("viewSemana").onclick = () => setView("semana");
+document.getElementById("viewPeriodo").onclick = () => setView("periodo");
+document.getElementById("periodoWeeks").addEventListener("change", () => {
+  if (viewMode === "periodo") renderPeriodo();
+});
 
 document.querySelectorAll(".tab-button").forEach((btn) => {
   btn.onclick = () => {

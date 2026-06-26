@@ -265,6 +265,39 @@
     border: 1px solid var(--border);
     border-radius: 6px;
   }
+  .view-toggle {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .view-toggle button {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .view-toggle button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  #periodoTable th, #periodoTable td {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  #periodoTable th.week-col {
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #periodoTable th.week-col:hover { background: var(--accent-light); }
+  #periodoTable .alloc-tag {
+    display: block;
+    width: fit-content;
+  }
 </style>
 </head>
 <body>
@@ -287,13 +320,34 @@
 <main>
   <section class="tab-panel active" id="tab-agendas">
     <div class="card">
-      <h2>Alocacao da semana</h2>
-      <table id="scheduleTable">
-        <thead>
-          <tr><th style="width:200px;">Consultor</th><th>Alocacoes (empresa / modalidade)</th></tr>
-        </thead>
-        <tbody id="scheduleBody"></tbody>
-      </table>
+      <div class="view-toggle">
+        <button id="viewSemana" class="active" data-view="semana">Semana</button>
+        <button id="viewPeriodo" data-view="periodo">Periodo</button>
+      </div>
+
+      <div id="semanaView">
+        <h2>Alocacao da semana</h2>
+        <table id="scheduleTable">
+          <thead>
+            <tr><th style="width:200px;">Consultor</th><th>Alocacoes (empresa / modalidade)</th></tr>
+          </thead>
+          <tbody id="scheduleBody"></tbody>
+        </table>
+      </div>
+
+      <div id="periodoView" style="display:none;">
+        <h2>Visao do periodo</h2>
+        <div class="setup-row" style="align-items:center;">
+          <label for="periodoWeeks" class="empty-hint">Semanas exibidas:</label>
+          <input id="periodoWeeks" type="number" min="2" max="26" value="8" style="max-width:90px; flex:none;">
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="periodoTable">
+            <thead><tr id="periodoHead"></tr></thead>
+            <tbody id="periodoBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </section>
 
