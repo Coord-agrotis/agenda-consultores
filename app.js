@@ -138,6 +138,85 @@ function isConsultorDeFeriasNaSemana(consultor, weekStart) {
   });
 }
 
+// --- Alloc form toggle state ---
+const openAllocForms = new Set();
+function formKey(weekKeyStr, consultor) {
+  return `${weekKeyStr}__${consultor}`;
+}
+
+function renderAllocControl(container, weekKeyStr, consultor, compact) {
+  if (state.empresas.length === 0) {
+    const hint = document.createElement("div");
+    hint.className = "empty-hint";
+    hint.textContent = "Cadastre empresas para alocar.";
+    container.appendChild(hint);
+    return;
+  }
+
+  const fk = formKey(weekKeyStr, consultor);
+
+  if (!openAllocForms.has(fk)) {
+    const btn = document.createElement("button");
+    btn.className = "add-agenda-btn";
+    btn.textContent = compact ? "+ Agenda" : "+ Adicionar agenda";
+    btn.onclick = () => {
+      openAllocForms.add(fk);
+      render();
+    };
+    container.appendChild(btn);
+    return;
+  }
+
+  const form = document.createElement("div");
+  form.className = compact ? "add-alloc-form periodo-cell-form" : "add-alloc-form";
+
+  const empresaSelect = document.createElement("select");
+  empresaSelect.multiple = true;
+  empresaSelect.size = Math.min(state.empresas.length, compact ? 4 : 5);
+  state.empresas.forEach((e) => {
+    const opt = document.createElement("option");
+    opt.value = e;
+    opt.textContent = e;
+    empresaSelect.appendChild(opt);
+  });
+
+  const modalidadeSelect = document.createElement("select");
+  ["presencial", "remoto"].forEach((m) => {
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m === "presencial" ? "Presencial" : "Remoto";
+    modalidadeSelect.appendChild(opt);
+  });
+
+  const addBtn = document.createElement("button");
+  addBtn.textContent = compact ? "+" : "Alocar";
+  addBtn.title = "Ctrl/Cmd + clique para selecionar varias empresas";
+  addBtn.onclick = () => {
+    const selecionadas = Array.from(empresaSelect.selectedOptions).map((o) => o.value);
+    openAllocForms.delete(fk);
+    addAllocacoes(weekKeyStr, consultor, selecionadas, modalidadeSelect.value);
+  };
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.textContent = "Cancelar";
+  cancelBtn.onclick = () => {
+    openAllocForms.delete(fk);
+    render();
+  };
+
+  form.appendChild(empresaSelect);
+  if (!compact) {
+    const hint = document.createElement("div");
+    hint.className = "empty-hint";
+    hint.textContent = "Ctrl/Cmd + clique para selecionar varias empresas";
+    form.appendChild(hint);
+  }
+  form.appendChild(modalidadeSelect);
+  form.appendChild(addBtn);
+  form.appendChild(cancelBtn);
+  container.appendChild(form);
+}
+
 // --- Rendering ---
 function render() {
   document.getElementById("weekLabel").textContent = formatWeekLabel(currentWeekStart);
@@ -215,50 +294,7 @@ function renderSchedule() {
       tdAlloc.appendChild(tag);
     });
 
-    if (state.empresas.length > 0) {
-      const form = document.createElement("div");
-      form.className = "add-alloc-form";
-
-      const empresaSelect = document.createElement("select");
-      empresaSelect.multiple = true;
-      empresaSelect.size = Math.min(state.empresas.length, 5);
-      state.empresas.forEach((e) => {
-        const opt = document.createElement("option");
-        opt.value = e;
-        opt.textContent = e;
-        empresaSelect.appendChild(opt);
-      });
-
-      const hint = document.createElement("div");
-      hint.className = "empty-hint";
-      hint.textContent = "Ctrl/Cmd + clique para selecionar varias empresas";
-
-      const modalidadeSelect = document.createElement("select");
-      ["presencial", "remoto"].forEach((m) => {
-        const opt = document.createElement("option");
-        opt.value = m;
-        opt.textContent = m === "presencial" ? "Presencial" : "Remoto";
-        modalidadeSelect.appendChild(opt);
-      });
-
-      const addBtn = document.createElement("button");
-      addBtn.textContent = "Alocar";
-      addBtn.onclick = () => {
-        const selecionadas = Array.from(empresaSelect.selectedOptions).map((o) => o.value);
-        addAllocacoes(key, consultor, selecionadas, modalidadeSelect.value);
-      };
-
-      form.appendChild(empresaSelect);
-      form.appendChild(hint);
-      form.appendChild(modalidadeSelect);
-      form.appendChild(addBtn);
-      tdAlloc.appendChild(form);
-    } else {
-      const hint = document.createElement("div");
-      hint.className = "empty-hint";
-      hint.textContent = "Cadastre empresas para alocar.";
-      tdAlloc.appendChild(hint);
-    }
+    renderAllocControl(tdAlloc, key, consultor, false);
 
     tr.appendChild(tdName);
     tr.appendChild(tdAlloc);
@@ -375,41 +411,7 @@ function renderPeriodo() {
         td.appendChild(tag);
       });
 
-      if (state.empresas.length > 0) {
-        const form = document.createElement("div");
-        form.className = "add-alloc-form periodo-cell-form";
-
-        const empresaSelect = document.createElement("select");
-        empresaSelect.multiple = true;
-        empresaSelect.size = Math.min(state.empresas.length, 4);
-        state.empresas.forEach((e) => {
-          const opt = document.createElement("option");
-          opt.value = e;
-          opt.textContent = e;
-          empresaSelect.appendChild(opt);
-        });
-
-        const modalidadeSelect = document.createElement("select");
-        ["presencial", "remoto"].forEach((m) => {
-          const opt = document.createElement("option");
-          opt.value = m;
-          opt.textContent = m === "presencial" ? "Presencial" : "Remoto";
-          modalidadeSelect.appendChild(opt);
-        });
-
-        const addBtn = document.createElement("button");
-        addBtn.textContent = "+";
-        addBtn.title = "Alocar nesta semana (Ctrl/Cmd + clique para varias empresas)";
-        addBtn.onclick = () => {
-          const selecionadas = Array.from(empresaSelect.selectedOptions).map((o) => o.value);
-          addAllocacoes(key, consultor, selecionadas, modalidadeSelect.value);
-        };
-
-        form.appendChild(empresaSelect);
-        form.appendChild(modalidadeSelect);
-        form.appendChild(addBtn);
-        td.appendChild(form);
-      }
+      renderAllocControl(td, key, consultor, true);
 
       if (allocs.length > 0 && idx < weekStarts.length - 1) {
         const replicarBtn = document.createElement("button");
