@@ -2,8 +2,24 @@ const STORAGE_KEY = "agenda-consultores-data";
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) return JSON.parse(raw);
-  return { consultores: [], clientes: [], allocations: {} };
+  if (!raw) return { consultores: [], empresas: [], allocations: {} };
+  const data = JSON.parse(raw);
+  if (data.clientes && !data.empresas) {
+    data.empresas = data.clientes;
+    delete data.clientes;
+    Object.values(data.allocations || {}).forEach((week) => {
+      Object.values(week).forEach((allocs) => {
+        allocs.forEach((a) => {
+          if (a.cliente && !a.empresa) {
+            a.empresa = a.cliente;
+            delete a.cliente;
+          }
+        });
+      });
+    });
+  }
+  if (!data.empresas) data.empresas = [];
+  return data;
 }
 
 function saveData() {
@@ -49,7 +65,7 @@ function formatWeekLabel(start) {
 function render() {
   document.getElementById("weekLabel").textContent = formatWeekLabel(currentWeekStart);
   renderChipList("consultorList", state.consultores, removeConsultor);
-  renderChipList("clienteList", state.clientes, removeCliente);
+  renderChipList("empresaList", state.empresas, removeEmpresa);
   renderSchedule();
   saveData();
 }
@@ -96,7 +112,7 @@ function renderSchedule() {
     consultorAllocs.forEach((alloc, idx) => {
       const tag = document.createElement("span");
       tag.className = `alloc-tag ${alloc.modalidade}`;
-      tag.innerHTML = `${escapeHtml(alloc.cliente)} &middot; ${alloc.modalidade === "presencial" ? "Presencial" : "Remoto"} `;
+      tag.innerHTML = `${escapeHtml(alloc.empresa)} &middot; ${alloc.modalidade === "presencial" ? "Presencial" : "Remoto"} `;
       const removeBtn = document.createElement("button");
       removeBtn.textContent = "x";
       removeBtn.onclick = () => removeAllocation(key, consultor, idx);
@@ -104,16 +120,16 @@ function renderSchedule() {
       tdAlloc.appendChild(tag);
     });
 
-    if (state.clientes.length > 0) {
+    if (state.empresas.length > 0) {
       const form = document.createElement("div");
       form.className = "add-alloc-form";
 
-      const clienteSelect = document.createElement("select");
-      state.clientes.forEach((c) => {
+      const empresaSelect = document.createElement("select");
+      state.empresas.forEach((e) => {
         const opt = document.createElement("option");
-        opt.value = c;
-        opt.textContent = c;
-        clienteSelect.appendChild(opt);
+        opt.value = e;
+        opt.textContent = e;
+        empresaSelect.appendChild(opt);
       });
 
       const modalidadeSelect = document.createElement("select");
@@ -126,16 +142,16 @@ function renderSchedule() {
 
       const addBtn = document.createElement("button");
       addBtn.textContent = "Alocar";
-      addBtn.onclick = () => addAllocation(key, consultor, clienteSelect.value, modalidadeSelect.value);
+      addBtn.onclick = () => addAllocation(key, consultor, empresaSelect.value, modalidadeSelect.value);
 
-      form.appendChild(clienteSelect);
+      form.appendChild(empresaSelect);
       form.appendChild(modalidadeSelect);
       form.appendChild(addBtn);
       tdAlloc.appendChild(form);
     } else {
       const hint = document.createElement("div");
       hint.className = "empty-hint";
-      hint.textContent = "Cadastre clientes para alocar.";
+      hint.textContent = "Cadastre empresas para alocar.";
       tdAlloc.appendChild(hint);
     }
 
@@ -165,27 +181,27 @@ function removeConsultor(name) {
   render();
 }
 
-function addCliente(name) {
+function addEmpresa(name) {
   const trimmed = name.trim();
-  if (!trimmed || state.clientes.includes(trimmed)) return;
-  state.clientes.push(trimmed);
+  if (!trimmed || state.empresas.includes(trimmed)) return;
+  state.empresas.push(trimmed);
   render();
 }
 
-function removeCliente(name) {
-  state.clientes = state.clientes.filter((c) => c !== name);
+function removeEmpresa(name) {
+  state.empresas = state.empresas.filter((e) => e !== name);
   Object.values(state.allocations).forEach((week) => {
     Object.keys(week).forEach((consultor) => {
-      week[consultor] = week[consultor].filter((a) => a.cliente !== name);
+      week[consultor] = week[consultor].filter((a) => a.empresa !== name);
     });
   });
   render();
 }
 
-function addAllocation(weekKeyStr, consultor, cliente, modalidade) {
+function addAllocation(weekKeyStr, consultor, empresa, modalidade) {
   if (!state.allocations[weekKeyStr]) state.allocations[weekKeyStr] = {};
   if (!state.allocations[weekKeyStr][consultor]) state.allocations[weekKeyStr][consultor] = [];
-  state.allocations[weekKeyStr][consultor].push({ cliente, modalidade });
+  state.allocations[weekKeyStr][consultor].push({ empresa, modalidade });
   render();
 }
 
@@ -201,17 +217,17 @@ document.getElementById("addConsultor").onclick = () => {
   input.value = "";
 };
 
-document.getElementById("addCliente").onclick = () => {
-  const input = document.getElementById("newCliente");
-  addCliente(input.value);
+document.getElementById("addEmpresa").onclick = () => {
+  const input = document.getElementById("newEmpresa");
+  addEmpresa(input.value);
   input.value = "";
 };
 
 document.getElementById("newConsultor").addEventListener("keydown", (e) => {
   if (e.key === "Enter") document.getElementById("addConsultor").click();
 });
-document.getElementById("newCliente").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") document.getElementById("addCliente").click();
+document.getElementById("newEmpresa").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("addEmpresa").click();
 });
 
 document.getElementById("prevWeek").onclick = () => {
