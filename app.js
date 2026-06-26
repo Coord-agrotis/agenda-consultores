@@ -338,27 +338,72 @@ function renderPeriodo() {
     tdName.textContent = consultor;
     tr.appendChild(tdName);
 
-    weekStarts.forEach((ws) => {
+    weekStarts.forEach((ws, idx) => {
       const td = document.createElement("td");
+      td.className = "periodo-cell";
+
       if (isConsultorDeFeriasNaSemana(consultor, ws)) {
         const tag = document.createElement("span");
         tag.className = "alloc-tag ferias";
         tag.textContent = "FERIAS";
         td.appendChild(tag);
-      } else {
-        const key = weekKey(ws);
-        const allocs = (state.allocations[key] || {})[consultor] || [];
-        if (allocs.length === 0) {
-          td.innerHTML = `<span class="empty-hint">-</span>`;
-        } else {
-          allocs.forEach((alloc) => {
-            const tag = document.createElement("span");
-            tag.className = `alloc-tag ${alloc.modalidade}`;
-            tag.textContent = `${alloc.empresa} (${alloc.modalidade === "presencial" ? "Presencial" : "Remoto"})`;
-            td.appendChild(tag);
-          });
-        }
+        tr.appendChild(td);
+        return;
       }
+
+      const key = weekKey(ws);
+      const allocs = (state.allocations[key] || {})[consultor] || [];
+
+      allocs.forEach((alloc, allocIdx) => {
+        const tag = document.createElement("span");
+        tag.className = `alloc-tag ${alloc.modalidade}`;
+        tag.innerHTML = `${escapeHtml(alloc.empresa)} (${alloc.modalidade === "presencial" ? "Pres." : "Rem."}) `;
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "x";
+        removeBtn.onclick = () => removeAllocation(key, consultor, allocIdx);
+        tag.appendChild(removeBtn);
+        td.appendChild(tag);
+      });
+
+      if (state.empresas.length > 0) {
+        const form = document.createElement("div");
+        form.className = "add-alloc-form periodo-cell-form";
+
+        const empresaSelect = document.createElement("select");
+        state.empresas.forEach((e) => {
+          const opt = document.createElement("option");
+          opt.value = e;
+          opt.textContent = e;
+          empresaSelect.appendChild(opt);
+        });
+
+        const modalidadeSelect = document.createElement("select");
+        ["presencial", "remoto"].forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m === "presencial" ? "Presencial" : "Remoto";
+          modalidadeSelect.appendChild(opt);
+        });
+
+        const addBtn = document.createElement("button");
+        addBtn.textContent = "+";
+        addBtn.title = "Alocar nesta semana";
+        addBtn.onclick = () => addAllocation(key, consultor, empresaSelect.value, modalidadeSelect.value);
+
+        form.appendChild(empresaSelect);
+        form.appendChild(modalidadeSelect);
+        form.appendChild(addBtn);
+        td.appendChild(form);
+      }
+
+      if (allocs.length > 0 && idx < weekStarts.length - 1) {
+        const replicarBtn = document.createElement("button");
+        replicarBtn.className = "periodo-replicar-btn";
+        replicarBtn.textContent = "Replicar para as proximas →";
+        replicarBtn.onclick = () => replicarAlocacaoConsultor(consultor, ws, weekStarts.slice(idx + 1));
+        td.appendChild(replicarBtn);
+      }
+
       tr.appendChild(td);
     });
 
@@ -537,6 +582,20 @@ function addAllocation(weekKeyStr, consultor, empresa, modalidade) {
 
 function removeAllocation(weekKeyStr, consultor, idx) {
   state.allocations[weekKeyStr][consultor].splice(idx, 1);
+  render();
+}
+
+function replicarAlocacaoConsultor(consultor, origemStart, destinosStart) {
+  const origemKey = weekKey(origemStart);
+  const allocs = (state.allocations[origemKey] || {})[consultor];
+  if (!allocs || allocs.length === 0) return;
+
+  destinosStart.forEach((destinoStart) => {
+    if (isConsultorDeFeriasNaSemana(consultor, destinoStart)) return;
+    const destinoKey = weekKey(destinoStart);
+    if (!state.allocations[destinoKey]) state.allocations[destinoKey] = {};
+    state.allocations[destinoKey][consultor] = allocs.map((a) => ({ ...a }));
+  });
   render();
 }
 
