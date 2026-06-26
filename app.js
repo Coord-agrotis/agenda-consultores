@@ -2,7 +2,7 @@ const STORAGE_KEY = "agenda-consultores-data";
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { consultores: [], empresas: [], allocations: {}, ferias: {}, contratos: {} };
+  if (!raw) return { consultores: [], empresas: [], allocations: {}, ferias: {}, contratos: {}, status: {} };
   const data = JSON.parse(raw);
   if (data.clientes && !data.empresas) {
     data.empresas = data.clientes;
@@ -21,6 +21,7 @@ function loadData() {
   if (!data.empresas) data.empresas = [];
   if (!data.ferias) data.ferias = {};
   if (!data.contratos) data.contratos = {};
+  if (!data.status) data.status = {};
   Object.keys(data.ferias).forEach((consultor) => {
     if (data.ferias[consultor].dataBase && !data.contratos[consultor]) {
       data.contratos[consultor] = data.ferias[consultor].dataBase;
@@ -105,6 +106,32 @@ function getVencimentoContrato(consultor) {
   return state.contratos[consultor] || null;
 }
 
+function getStatusConsultor(consultor) {
+  if (!state.status[consultor]) state.status[consultor] = { ativo: true, dataRescisao: null };
+  return state.status[consultor];
+}
+
+function isConsultorAtivo(consultor) {
+  return getStatusConsultor(consultor).ativo;
+}
+
+function setStatusConsultor(consultor, ativo) {
+  const status = getStatusConsultor(consultor);
+  status.ativo = ativo;
+  if (ativo) status.dataRescisao = null;
+  saveData();
+  render();
+}
+
+function setDataRescisao(consultor, data) {
+  getStatusConsultor(consultor).dataRescisao = data;
+  saveData();
+}
+
+function getConsultoresAtivos() {
+  return state.consultores.filter((c) => isConsultorAtivo(c));
+}
+
 function setVencimentoContrato(consultor, data) {
   state.contratos[consultor] = data;
   saveData();
@@ -170,8 +197,9 @@ function isConsultorDeFeriasHoje(consultor) {
 }
 
 function getConsultoresFiltrados() {
-  if (filtroConsultorAtual === "todos") return state.consultores;
-  return state.consultores.filter((c) => c === filtroConsultorAtual);
+  const ativos = getConsultoresAtivos();
+  if (filtroConsultorAtual === "todos") return ativos;
+  return ativos.filter((c) => c === filtroConsultorAtual);
 }
 
 // --- Alloc form toggle state ---
@@ -276,14 +304,15 @@ function render() {
 function renderFiltroConsultor() {
   const select = document.getElementById("filtroConsultor");
   const valorAtual = select.value || filtroConsultorAtual;
+  const ativos = getConsultoresAtivos();
   select.innerHTML = `<option value="todos">Todos os consultores</option>`;
-  state.consultores.forEach((c) => {
+  ativos.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = c;
     opt.textContent = c;
     select.appendChild(opt);
   });
-  if (state.consultores.includes(valorAtual) || valorAtual === "todos") {
+  if (ativos.includes(valorAtual) || valorAtual === "todos") {
     select.value = valorAtual;
     filtroConsultorAtual = valorAtual;
   } else {
@@ -321,12 +350,23 @@ function renderConsultoresList() {
   }
 
   state.consultores.forEach((consultor) => {
+    const status = getStatusConsultor(consultor);
     const row = document.createElement("div");
     row.className = "consultor-row";
 
     const nome = document.createElement("span");
     nome.className = "consultor-nome";
     nome.textContent = consultor;
+
+    const statusSelect = document.createElement("select");
+    ["ativo", "inativo"].forEach((v) => {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v === "ativo" ? "Ativo" : "Inativo";
+      statusSelect.appendChild(opt);
+    });
+    statusSelect.value = status.ativo ? "ativo" : "inativo";
+    statusSelect.onchange = () => setStatusConsultor(consultor, statusSelect.value === "ativo");
 
     const lbl = document.createElement("span");
     lbl.className = "consultor-contrato-lbl";
@@ -337,17 +377,32 @@ function renderConsultoresList() {
     if (state.contratos[consultor]) dataInput.value = state.contratos[consultor];
     dataInput.onchange = () => setVencimentoContrato(consultor, dataInput.value);
 
+    row.appendChild(nome);
+    row.appendChild(statusSelect);
+
+    if (!status.ativo) {
+      const rescisaoLbl = document.createElement("span");
+      rescisaoLbl.className = "consultor-contrato-lbl";
+      rescisaoLbl.textContent = "Data de rescisao:";
+      const rescisaoInput = document.createElement("input");
+      rescisaoInput.type = "date";
+      if (status.dataRescisao) rescisaoInput.value = status.dataRescisao;
+      rescisaoInput.onchange = () => setDataRescisao(consultor, rescisaoInput.value);
+      row.appendChild(rescisaoLbl);
+      row.appendChild(rescisaoInput);
+    }
+
+    row.appendChild(lbl);
+    row.appendChild(dataInput);
+
     const chip = document.createElement("div");
     chip.className = "chip";
     const removeBtn = document.createElement("button");
     removeBtn.textContent = "x";
     removeBtn.onclick = () => removeConsultor(consultor);
     chip.appendChild(removeBtn);
-
-    row.appendChild(nome);
-    row.appendChild(lbl);
-    row.appendChild(dataInput);
     row.appendChild(chip);
+
     container.appendChild(row);
   });
 }
@@ -603,8 +658,9 @@ function renderFeriasResumo() {
   let semDataBase = 0;
   let saldoCritico = 0;
   let diasVencidos = 0;
+  const ativos = getConsultoresAtivos();
 
-  state.consultores.forEach((consultor) => {
+  ativos.forEach((consultor) => {
     if (isConsultorDeFeriasHoje(consultor)) emFeriasHoje++;
     if (!getVencimentoContrato(consultor)) {
       semDataBase++;
@@ -617,7 +673,7 @@ function renderFeriasResumo() {
   });
 
   const cards = [
-    { lbl: "Consultores", val: state.consultores.length },
+    { lbl: "Consultores ativos", val: ativos.length },
     { lbl: "Em ferias hoje", val: emFeriasHoje, cls: emFeriasHoje > 0 ? "warn" : "ok" },
     { lbl: "Saldo critico (<=5 dias)", val: saldoCritico, cls: saldoCritico > 0 ? "danger" : "ok" },
     { lbl: "Dias vencidos (total)", val: diasVencidos, cls: diasVencidos > 0 ? "danger" : "ok" },
@@ -642,8 +698,10 @@ function renderDashboard() {
   let emFeriasHoje = 0;
   const empresasSemana = new Set();
   const alertas = [];
+  const ativos = getConsultoresAtivos();
+  const inativos = state.consultores.length - ativos.length;
 
-  state.consultores.forEach((consultor) => {
+  ativos.forEach((consultor) => {
     if (isConsultorDeFeriasHoje(consultor)) emFeriasHoje++;
     if (!isConsultorDeFeriasNaSemana(consultor, hojeWeekStart)) {
       (hojeAllocs[consultor] || []).forEach((alloc) => {
@@ -658,7 +716,8 @@ function renderDashboard() {
   });
 
   const cards = [
-    { lbl: "Total de consultores", val: state.consultores.length },
+    { lbl: "Consultores ativos", val: ativos.length },
+    { lbl: "Consultores inativos", val: inativos, cls: inativos > 0 ? "warn" : "ok" },
     { lbl: "Empresas cadastradas", val: state.empresas.length },
     { lbl: "Em ferias hoje", val: emFeriasHoje, cls: emFeriasHoje > 0 ? "warn" : "ok" },
     { lbl: "Alocacoes (semana atual)", val: totalAlocacoesSemana },
@@ -690,11 +749,21 @@ function renderFerias() {
 
   state.consultores.forEach((consultor) => {
     const info = getFeriasConsultor(consultor);
+    const status = getStatusConsultor(consultor);
     const card = document.createElement("div");
     card.className = "ferias-card";
 
     const title = document.createElement("h3");
     title.textContent = consultor;
+    if (!status.ativo) {
+      const badge = document.createElement("span");
+      badge.className = "status-chip passado";
+      badge.style.marginLeft = "8px";
+      badge.textContent = status.dataRescisao
+        ? `Inativo desde ${parseDate(status.dataRescisao).toLocaleDateString("pt-BR")}`
+        : "Inativo";
+      title.appendChild(badge);
+    }
     card.appendChild(title);
 
     const vencimento = getVencimentoContrato(consultor);
@@ -770,6 +839,7 @@ function removeConsultor(name) {
   Object.values(state.allocations).forEach((week) => delete week[name]);
   delete state.ferias[name];
   delete state.contratos[name];
+  delete state.status[name];
   render();
 }
 
@@ -874,6 +944,7 @@ function importBackupJson(file) {
       Object.assign(state, data);
       if (!state.ferias) state.ferias = {};
       if (!state.contratos) state.contratos = {};
+      if (!state.status) state.status = {};
       render();
       alert("Backup importado com sucesso.");
     } catch (err) {
