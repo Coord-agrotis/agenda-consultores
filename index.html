@@ -184,6 +184,30 @@
     color: var(--muted);
     font-size: 13px;
   }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    max-width: 1100px;
+    margin: 16px auto 0;
+    padding: 0 16px;
+  }
+  .tab-button {
+    border: 1px solid var(--border);
+    border-bottom: none;
+    background: var(--bg);
+    color: var(--muted);
+    padding: 10px 18px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .tab-button.active {
+    background: var(--card);
+    color: var(--text);
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: grid; gap: 20px; }
 </style>
 </head>
 <body>
@@ -197,33 +221,42 @@
   </div>
 </header>
 
+<nav class="tabs">
+  <button class="tab-button active" data-tab="agendas">Agendas</button>
+  <button class="tab-button" data-tab="cadastro">Cadastro</button>
+</nav>
+
 <main>
-  <section class="card">
-    <h2>Consultores</h2>
-    <div class="setup-row">
-      <input id="newConsultor" type="text" placeholder="Nome do consultor">
-      <button id="addConsultor">Adicionar</button>
+  <section class="tab-panel active" id="tab-agendas">
+    <div class="card">
+      <h2>Alocacao da semana</h2>
+      <table id="scheduleTable">
+        <thead>
+          <tr><th style="width:200px;">Consultor</th><th>Alocacoes (cliente / modalidade)</th></tr>
+        </thead>
+        <tbody id="scheduleBody"></tbody>
+      </table>
     </div>
-    <div class="chip-list" id="consultorList"></div>
   </section>
 
-  <section class="card">
-    <h2>Clientes</h2>
-    <div class="setup-row">
-      <input id="newCliente" type="text" placeholder="Nome do cliente">
-      <button id="addCliente">Adicionar</button>
+  <section class="tab-panel" id="tab-cadastro">
+    <div class="card">
+      <h2>Consultores</h2>
+      <div class="setup-row">
+        <input id="newConsultor" type="text" placeholder="Nome do consultor">
+        <button id="addConsultor">Adicionar</button>
+      </div>
+      <div class="chip-list" id="consultorList"></div>
     </div>
-    <div class="chip-list" id="clienteList"></div>
-  </section>
 
-  <section class="card">
-    <h2>Alocacao da semana</h2>
-    <table id="scheduleTable">
-      <thead>
-        <tr><th style="width:200px;">Consultor</th><th>Alocacoes (cliente / modalidade)</th></tr>
-      </thead>
-      <tbody id="scheduleBody"></tbody>
-    </table>
+    <div class="card">
+      <h2>Clientes</h2>
+      <div class="setup-row">
+        <input id="newCliente" type="text" placeholder="Nome do cliente">
+        <button id="addCliente">Adicionar</button>
+      </div>
+      <div class="chip-list" id="clienteList"></div>
+    </div>
   </section>
 </main>
 
