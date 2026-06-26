@@ -2,7 +2,7 @@ const STORAGE_KEY = "agenda-consultores-data";
 
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { consultores: [], empresas: [], allocations: {}, ferias: {} };
+  if (!raw) return { consultores: [], empresas: [], allocations: {}, ferias: {}, contratos: {} };
   const data = JSON.parse(raw);
   if (data.clientes && !data.empresas) {
     data.empresas = data.clientes;
@@ -20,6 +20,12 @@ function loadData() {
   }
   if (!data.empresas) data.empresas = [];
   if (!data.ferias) data.ferias = {};
+  if (!data.contratos) data.contratos = {};
+  Object.keys(data.ferias).forEach((consultor) => {
+    if (data.ferias[consultor].dataBase && !data.contratos[consultor]) {
+      data.contratos[consultor] = data.ferias[consultor].dataBase;
+    }
+  });
   return data;
 }
 
@@ -91,14 +97,27 @@ function diasEntre(inicio, fim) {
 }
 
 function getFeriasConsultor(consultor) {
-  if (!state.ferias[consultor]) state.ferias[consultor] = { dataBase: null, periodos: [] };
+  if (!state.ferias[consultor]) state.ferias[consultor] = { periodos: [] };
   return state.ferias[consultor];
+}
+
+function getVencimentoContrato(consultor) {
+  return state.contratos[consultor] || null;
+}
+
+function setVencimentoContrato(consultor, data) {
+  state.contratos[consultor] = data;
+  saveData();
+  renderFerias();
+  renderFeriasResumo();
+  renderDashboard();
 }
 
 function getCiclosConsultor(consultor) {
   const info = getFeriasConsultor(consultor);
-  if (!info.dataBase) return [];
-  const base = parseDate(info.dataBase);
+  const dataBase = getVencimentoContrato(consultor);
+  if (!dataBase) return [];
+  const base = parseDate(dataBase);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const ciclos = [];
@@ -238,7 +257,7 @@ function renderAllocControl(container, weekKeyStr, consultor, compact) {
 // --- Rendering ---
 function render() {
   document.getElementById("weekLabel").textContent = formatWeekLabel(currentWeekStart);
-  renderChipList("consultorList", state.consultores, removeConsultor);
+  renderConsultoresList();
   renderChipList("empresaList", state.empresas, removeEmpresa);
   renderFiltroConsultor();
   if (viewMode === "semana") {
@@ -289,6 +308,47 @@ function renderChipList(containerId, items, onRemove) {
     btn.onclick = () => onRemove(item);
     chip.appendChild(btn);
     container.appendChild(chip);
+  });
+}
+
+function renderConsultoresList() {
+  const container = document.getElementById("consultorList");
+  container.innerHTML = "";
+
+  if (state.consultores.length === 0) {
+    container.innerHTML = `<span class="empty-hint">Nenhum consultor cadastrado ainda.</span>`;
+    return;
+  }
+
+  state.consultores.forEach((consultor) => {
+    const row = document.createElement("div");
+    row.className = "consultor-row";
+
+    const nome = document.createElement("span");
+    nome.className = "consultor-nome";
+    nome.textContent = consultor;
+
+    const lbl = document.createElement("span");
+    lbl.className = "consultor-contrato-lbl";
+    lbl.textContent = "Vencimento do contrato:";
+
+    const dataInput = document.createElement("input");
+    dataInput.type = "date";
+    if (state.contratos[consultor]) dataInput.value = state.contratos[consultor];
+    dataInput.onchange = () => setVencimentoContrato(consultor, dataInput.value);
+
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "x";
+    removeBtn.onclick = () => removeConsultor(consultor);
+    chip.appendChild(removeBtn);
+
+    row.appendChild(nome);
+    row.appendChild(lbl);
+    row.appendChild(dataInput);
+    row.appendChild(chip);
+    container.appendChild(row);
   });
 }
 
@@ -482,13 +542,12 @@ function setView(mode) {
 }
 
 function renderCiclosBox(box, consultor) {
-  const info = getFeriasConsultor(consultor);
   box.innerHTML = "";
 
-  if (!info.dataBase) {
+  if (!getVencimentoContrato(consultor)) {
     const hint = document.createElement("div");
     hint.className = "empty-hint";
-    hint.textContent = "Defina a data base para calcular o saldo de ferias.";
+    hint.textContent = "Defina o vencimento do contrato na aba Cadastro para calcular o saldo de ferias.";
     box.appendChild(hint);
     return;
   }
@@ -547,8 +606,7 @@ function renderFeriasResumo() {
 
   state.consultores.forEach((consultor) => {
     if (isConsultorDeFeriasHoje(consultor)) emFeriasHoje++;
-    const info = getFeriasConsultor(consultor);
-    if (!info.dataBase) {
+    if (!getVencimentoContrato(consultor)) {
       semDataBase++;
       return;
     }
@@ -563,7 +621,7 @@ function renderFeriasResumo() {
     { lbl: "Em ferias hoje", val: emFeriasHoje, cls: emFeriasHoje > 0 ? "warn" : "ok" },
     { lbl: "Saldo critico (<=5 dias)", val: saldoCritico, cls: saldoCritico > 0 ? "danger" : "ok" },
     { lbl: "Dias vencidos (total)", val: diasVencidos, cls: diasVencidos > 0 ? "danger" : "ok" },
-    { lbl: "Sem data base", val: semDataBase, cls: semDataBase > 0 ? "warn" : "ok" },
+    { lbl: "Sem vencimento de contrato", val: semDataBase, cls: semDataBase > 0 ? "warn" : "ok" },
   ];
 
   container.innerHTML = cards
@@ -639,17 +697,13 @@ function renderFerias() {
     title.textContent = consultor;
     card.appendChild(title);
 
-    const baseRow = document.createElement("div");
-    baseRow.className = "data-base-row";
-    const baseLabel = document.createElement("span");
-    baseLabel.textContent = "Data base:";
-    const baseInput = document.createElement("input");
-    baseInput.type = "date";
-    if (info.dataBase) baseInput.value = info.dataBase;
-    baseInput.onchange = () => setDataBase(consultor, baseInput.value);
-    baseRow.appendChild(baseLabel);
-    baseRow.appendChild(baseInput);
-    card.appendChild(baseRow);
+    const vencimento = getVencimentoContrato(consultor);
+    if (vencimento) {
+      const baseRow = document.createElement("div");
+      baseRow.className = "data-base-row";
+      baseRow.innerHTML = `Vencimento do contrato: <strong>${parseDate(vencimento).toLocaleDateString("pt-BR")}</strong> (definido na aba Cadastro)`;
+      card.appendChild(baseRow);
+    }
 
     const ciclosBox = document.createElement("div");
     ciclosBox.dataset.ciclosFor = consultor;
@@ -715,6 +769,7 @@ function removeConsultor(name) {
   state.consultores = state.consultores.filter((c) => c !== name);
   Object.values(state.allocations).forEach((week) => delete week[name]);
   delete state.ferias[name];
+  delete state.contratos[name];
   render();
 }
 
@@ -784,15 +839,6 @@ function replicarSemanaAtual(numSemanas) {
   render();
 }
 
-function setDataBase(consultor, dataBase) {
-  getFeriasConsultor(consultor).dataBase = dataBase;
-  saveData();
-  const box = document.querySelector(`[data-ciclos-for="${CSS.escape(consultor)}"]`);
-  if (box) renderCiclosBox(box, consultor);
-  renderFeriasResumo();
-  renderDashboard();
-}
-
 function addPeriodoFerias(consultor, inicio, fim) {
   if (parseDate(fim) < parseDate(inicio)) return;
   getFeriasConsultor(consultor).periodos.push({ inicio, fim });
@@ -827,6 +873,7 @@ function importBackupJson(file) {
       if (!data.consultores || !data.empresas) throw new Error("Arquivo invalido");
       Object.assign(state, data);
       if (!state.ferias) state.ferias = {};
+      if (!state.contratos) state.contratos = {};
       render();
       alert("Backup importado com sucesso.");
     } catch (err) {

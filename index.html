@@ -134,6 +134,33 @@
     font-size: 13px;
     font-weight: 600;
   }
+  .consultor-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 4px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .consultor-row:last-child { border-bottom: none; }
+  .consultor-row .consultor-nome {
+    font-weight: 600;
+    min-width: 160px;
+    flex: 1;
+  }
+  .consultor-row .consultor-contrato-lbl {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .consultor-row input[type="date"] {
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .consultor-row .chip button {
+    margin-left: 4px;
+  }
   .chip button {
     border: none;
     background: none;
@@ -553,7 +580,8 @@
         <input id="newConsultor" type="text" placeholder="Nome do consultor">
         <button id="addConsultor">Adicionar</button>
       </div>
-      <div class="chip-list" id="consultorList"></div>
+      <p class="empty-hint" style="margin-bottom:10px;">A data de vencimento do contrato e usada como data base para o calculo do ciclo de ferias.</p>
+      <div id="consultorList"></div>
     </div>
 
     <div class="card">
