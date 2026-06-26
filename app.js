@@ -89,41 +89,42 @@ function diasEntre(inicio, fim) {
   return Math.round((fim - inicio) / MS_DAY) + 1;
 }
 
-function getCicloAtual(dataBaseStr, refDate) {
-  const base = parseDate(dataBaseStr);
-  let n = refDate.getFullYear() - base.getFullYear();
-  let cicloInicio = addYears(base, n);
-  if (cicloInicio > refDate) {
-    n -= 1;
-    cicloInicio = addYears(base, n);
-  }
-  let cicloFim = new Date(addYears(base, n + 1) - MS_DAY);
-  while (cicloFim < refDate) {
-    n += 1;
-    cicloInicio = addYears(base, n);
-    cicloFim = new Date(addYears(base, n + 1) - MS_DAY);
-  }
-  return { inicio: cicloInicio, fim: cicloFim };
-}
-
 function getFeriasConsultor(consultor) {
   if (!state.ferias[consultor]) state.ferias[consultor] = { dataBase: null, periodos: [] };
   return state.ferias[consultor];
 }
 
-function calcularSaldo(consultor, refDate) {
+function getCiclosConsultor(consultor) {
   const info = getFeriasConsultor(consultor);
-  if (!info.dataBase) return null;
-  const ciclo = getCicloAtual(info.dataBase, refDate);
-  let usados = 0;
-  info.periodos.forEach((p) => {
-    const pIni = parseDate(p.inicio);
-    const pFim = parseDate(p.fim);
-    const overlapIni = pIni > ciclo.inicio ? pIni : ciclo.inicio;
-    const overlapFim = pFim < ciclo.fim ? pFim : ciclo.fim;
-    if (overlapFim >= overlapIni) usados += diasEntre(overlapIni, overlapFim);
-  });
-  return { ciclo, usados, saldo: DIREITO_DIAS - usados };
+  if (!info.dataBase) return [];
+  const base = parseDate(info.dataBase);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const ciclos = [];
+  let n = 0;
+  while (n < 50) {
+    const inicio = addYears(base, n);
+    const fim = new Date(addYears(base, n + 1) - MS_DAY);
+    let usados = 0;
+    info.periodos.forEach((p) => {
+      const pIni = parseDate(p.inicio);
+      const pFim = parseDate(p.fim);
+      const overlapIni = pIni > inicio ? pIni : inicio;
+      const overlapFim = pFim < fim ? pFim : fim;
+      if (overlapFim >= overlapIni) usados += diasEntre(overlapIni, overlapFim);
+    });
+    const saldo = DIREITO_DIAS - usados;
+    const status = fim < now ? "passado" : inicio <= now && fim >= now ? "atual" : "futuro";
+    let alerta = { texto: `${saldo} dias`, nivel: "ok" };
+    if (status === "passado" && saldo > 0) alerta = { texto: `${saldo} dias vencidos`, nivel: "danger" };
+    else if (status === "passado") alerta = { texto: "Completo", nivel: "ok" };
+    else if (status === "atual" && saldo <= 0) alerta = { texto: "Sem saldo", nivel: "danger" };
+    else if (status === "atual" && saldo <= 5) alerta = { texto: `Apenas ${saldo} dias`, nivel: "warn" };
+    ciclos.push({ num: n + 1, inicio, fim, usados, saldo, status, alerta });
+    if (inicio > now) break;
+    n++;
+  }
+  return ciclos;
 }
 
 function isConsultorDeFeriasNaSemana(consultor, weekStart) {
@@ -144,8 +145,10 @@ function render() {
   renderChipList("empresaList", state.empresas, removeEmpresa);
   if (viewMode === "semana") {
     renderSchedule();
+    renderResumoSemana();
   } else {
     renderPeriodo();
+    document.getElementById("sumCards").innerHTML = "";
   }
   renderFerias();
   saveData();
@@ -251,6 +254,42 @@ function renderSchedule() {
     tr.appendChild(tdAlloc);
     body.appendChild(tr);
   });
+}
+
+function renderResumoSemana() {
+  const key = weekKey(currentWeekStart);
+  const weekAllocs = state.allocations[key] || {};
+
+  let totalAlocacoes = 0;
+  let presencial = 0;
+  let remoto = 0;
+  let emFerias = 0;
+  const empresasNaSemana = new Set();
+
+  state.consultores.forEach((consultor) => {
+    if (isConsultorDeFeriasNaSemana(consultor, currentWeekStart)) {
+      emFerias++;
+      return;
+    }
+    (weekAllocs[consultor] || []).forEach((alloc) => {
+      totalAlocacoes++;
+      empresasNaSemana.add(alloc.empresa);
+      if (alloc.modalidade === "presencial") presencial++;
+      else remoto++;
+    });
+  });
+
+  const cards = [
+    { lbl: "Alocacoes na semana", val: totalAlocacoes },
+    { lbl: "Empresas atendidas", val: empresasNaSemana.size },
+    { lbl: "Presencial", val: presencial },
+    { lbl: "Remoto", val: remoto },
+    { lbl: "Consultores de ferias", val: emFerias },
+  ];
+
+  document.getElementById("sumCards").innerHTML = cards
+    .map((c) => `<div class="sum-card"><div class="sum-lbl">${c.lbl}</div><div class="sum-val">${c.val}</div></div>`)
+    .join("");
 }
 
 function renderPeriodo() {
@@ -367,16 +406,42 @@ function renderFerias() {
     card.appendChild(baseRow);
 
     if (info.dataBase) {
-      const saldoInfo = calcularSaldo(consultor, new Date());
-      const saldoBox = document.createElement("div");
-      saldoBox.className = "saldo-box";
       const fmt = (d) => d.toLocaleDateString("pt-BR");
-      saldoBox.innerHTML = `
-        <span class="pill">Periodo atual: ${fmt(saldoInfo.ciclo.inicio)} a ${fmt(saldoInfo.ciclo.fim)}</span>
-        <span class="pill">Dias utilizados: ${saldoInfo.usados}</span>
-        <span class="pill ${saldoInfo.saldo <= 0 ? "alert" : ""}">Saldo: ${saldoInfo.saldo} dias</span>
+      const ciclos = getCiclosConsultor(consultor);
+      const table = document.createElement("table");
+      table.className = "ciclos-table";
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Periodo</th><th>Inicio</th><th>Fim</th><th>Dias usados</th><th>Saldo</th><th>Status</th><th>Alerta</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ciclos
+            .map((c) => {
+              const pct = Math.min(100, Math.round((c.usados / DIREITO_DIAS) * 100));
+              const barColor = c.saldo <= 0 ? "var(--danger)" : c.saldo <= 5 ? "#92400e" : "var(--presencial)";
+              return `
+                <tr>
+                  <td>${c.num}${c.status === "atual" ? " &middot; atual" : ""}</td>
+                  <td>${fmt(c.inicio)}</td>
+                  <td>${fmt(c.fim)}</td>
+                  <td>${c.usados}</td>
+                  <td>
+                    <div class="saldo-bar-wrap">
+                      <div class="saldo-bar-track"><div class="saldo-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+                      <span>${c.saldo}</span>
+                    </div>
+                  </td>
+                  <td><span class="status-chip ${c.status}">${c.status}</span></td>
+                  <td><span class="alert-pill ${c.alerta.nivel}">${c.alerta.texto}</span></td>
+                </tr>
+              `;
+            })
+            .join("")}
+        </tbody>
       `;
-      card.appendChild(saldoBox);
+      card.appendChild(table);
     } else {
       const hint = document.createElement("div");
       hint.className = "empty-hint";
@@ -491,6 +556,53 @@ function removePeriodoFerias(consultor, idx) {
   render();
 }
 
+// --- Backup ---
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportBackupJson() {
+  const dataStr = JSON.stringify(state, null, 2);
+  downloadFile(`agenda-consultores-backup-${dateToStr(new Date())}.json`, dataStr, "application/json");
+}
+
+function importBackupJson(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.consultores || !data.empresas) throw new Error("Arquivo invalido");
+      Object.assign(state, data);
+      if (!state.ferias) state.ferias = {};
+      render();
+      alert("Backup importado com sucesso.");
+    } catch (err) {
+      alert("Erro ao importar: arquivo invalido.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function exportAllocationsCsv() {
+  const rows = [["Semana", "Consultor", "Empresa", "Modalidade"]];
+  Object.keys(state.allocations)
+    .sort()
+    .forEach((week) => {
+      Object.keys(state.allocations[week]).forEach((consultor) => {
+        state.allocations[week][consultor].forEach((alloc) => {
+          rows.push([week, consultor, alloc.empresa, alloc.modalidade]);
+        });
+      });
+    });
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  downloadFile(`alocacoes-${dateToStr(new Date())}.csv`, "﻿" + csv, "text/csv;charset=utf-8");
+}
+
 // --- Event wiring ---
 document.getElementById("addConsultor").onclick = () => {
   const input = document.getElementById("newConsultor");
@@ -528,6 +640,17 @@ document.getElementById("viewSemana").onclick = () => setView("semana");
 document.getElementById("viewPeriodo").onclick = () => setView("periodo");
 document.getElementById("periodoWeeks").addEventListener("change", () => {
   if (viewMode === "periodo") renderPeriodo();
+});
+
+document.getElementById("exportBackup").onclick = exportBackupJson;
+document.getElementById("exportCsv").onclick = exportAllocationsCsv;
+document.getElementById("importBackupBtn").onclick = () => {
+  document.getElementById("importBackupFile").click();
+};
+document.getElementById("importBackupFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) importBackupJson(file);
+  e.target.value = "";
 });
 
 document.querySelectorAll(".tab-button").forEach((btn) => {

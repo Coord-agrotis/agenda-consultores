@@ -298,6 +298,77 @@
     display: block;
     width: fit-content;
   }
+  .sum-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .sum-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .sum-card .sum-lbl {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .sum-card .sum-val {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .ciclos-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .ciclos-table th, .ciclos-table td {
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    text-align: left;
+  }
+  .ciclos-table th { background: #fafbfc; font-weight: 600; color: var(--muted); font-size: 11px; }
+  .saldo-bar-wrap { display: flex; align-items: center; gap: 6px; min-width: 110px; }
+  .saldo-bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .saldo-bar-fill { height: 100%; border-radius: 3px; }
+  .status-chip {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .status-chip.atual { background: #d1fae5; color: var(--presencial); }
+  .status-chip.passado { background: var(--surf3, #e8e5df); color: var(--muted); }
+  .status-chip.futuro { background: var(--accent-light); color: var(--accent); }
+  .alert-pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .alert-pill.ok { background: #d1fae5; color: var(--presencial); }
+  .alert-pill.warn { background: #fef3c7; color: #92400e; }
+  .alert-pill.danger { background: #fee2e2; color: var(--danger); }
+  .backup-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .backup-row button {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .backup-row button:hover { background: var(--accent-light); }
 </style>
 </head>
 <body>
@@ -319,6 +390,8 @@
 
 <main>
   <section class="tab-panel active" id="tab-agendas">
+    <div class="sum-grid" id="sumCards"></div>
+
     <div class="card">
       <div class="view-toggle">
         <button id="viewSemana" class="active" data-view="semana">Semana</button>
@@ -368,6 +441,17 @@
         <button id="addEmpresa">Adicionar</button>
       </div>
       <div class="chip-list" id="empresaList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Backup dos dados</h2>
+      <p class="empty-hint" style="margin-bottom:10px;">Os dados ficam salvos apenas no navegador deste computador. Exporte um backup periodicamente para nao perde-los.</p>
+      <div class="backup-row">
+        <button id="exportBackup">Exportar backup (JSON)</button>
+        <button id="importBackupBtn">Importar backup (JSON)</button>
+        <button id="exportCsv">Exportar alocacoes (CSV)</button>
+        <input type="file" id="importBackupFile" accept=".json" style="display:none;">
+      </div>
     </div>
   </section>
 
