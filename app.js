@@ -32,9 +32,233 @@ function loadData() {
 
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleSheetsSave();
 }
 
 const state = loadData();
+
+// --- Google Sheets sync ---
+const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+const GS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+let gsClientId = localStorage.getItem("agenda_gs_client") || "";
+let gsSheetId = localStorage.getItem("agenda_gs_sheet") || "";
+let gsAccessToken = "";
+let gsTokenExpiry = 0;
+let gsTokenClient = null;
+let gsSaveTimer = null;
+let gsApplyingRemote = false;
+
+function loadGisScript() {
+  return new Promise((resolve) => {
+    if (window.google && window.google.accounts) {
+      resolve();
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = resolve;
+    document.head.appendChild(s);
+  });
+}
+
+function gsIsTokenValid() {
+  return gsAccessToken && Date.now() < gsTokenExpiry - 60000;
+}
+
+function gsGetToken(interactive) {
+  return new Promise((resolve, reject) => {
+    if (gsIsTokenValid()) {
+      resolve();
+      return;
+    }
+    if (!gsTokenClient) {
+      reject(new Error("Cliente OAuth nao inicializado."));
+      return;
+    }
+    gsTokenClient.callback = (resp) => {
+      if (resp.error) {
+        reject(new Error(resp.error));
+        return;
+      }
+      gsAccessToken = resp.access_token;
+      gsTokenExpiry = Date.now() + (resp.expires_in || 3600) * 1000;
+      resolve();
+    };
+    gsTokenClient.requestAccessToken({ prompt: interactive ? "consent" : "" });
+  });
+}
+
+async function gsCreateSheet() {
+  const r = await fetch(SHEETS_API, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${gsAccessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ properties: { title: "Agenda de Consultores" }, sheets: [{ properties: { title: "dados" } }] }),
+  });
+  if (!r.ok) throw new Error(`Falha ao criar planilha (${r.status})`);
+  const d = await r.json();
+  gsSheetId = d.spreadsheetId;
+  return gsSheetId;
+}
+
+async function gsSave() {
+  if (!gsSheetId) return;
+  setSyncStatus("syncing", "Salvando...");
+  try {
+    await gsGetToken(false);
+    const r = await fetch(`${SHEETS_API}/${gsSheetId}/values/dados!A1?valueInputOption=RAW`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${gsAccessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: [[JSON.stringify(state)]] }),
+    });
+    if (!r.ok) throw new Error(`Sheets API ${r.status}`);
+    setSyncStatus("ok", `Sincronizado as ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+  } catch (e) {
+    console.error("gsSave", e);
+    setSyncStatus("err", "Erro ao salvar na planilha");
+  }
+}
+
+async function gsLoad() {
+  if (!gsSheetId) return false;
+  setSyncStatus("syncing", "Atualizando...");
+  try {
+    await gsGetToken(false);
+    const r = await fetch(`${SHEETS_API}/${gsSheetId}/values/dados!A1`, {
+      headers: { Authorization: `Bearer ${gsAccessToken}` },
+    });
+    if (!r.ok) throw new Error(`Sheets API ${r.status}`);
+    const d = await r.json();
+    const raw = d.values && d.values[0] && d.values[0][0];
+    if (raw) {
+      const remote = JSON.parse(raw);
+      gsApplyingRemote = true;
+      Object.assign(state, remote);
+      if (!state.empresas) state.empresas = [];
+      if (!state.ferias) state.ferias = {};
+      if (!state.contratos) state.contratos = {};
+      if (!state.status) state.status = {};
+      render();
+      gsApplyingRemote = false;
+    }
+    setSyncStatus("ok", `Sincronizado as ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+    return true;
+  } catch (e) {
+    console.error("gsLoad", e);
+    setSyncStatus("err", "Erro ao carregar a planilha");
+    return false;
+  }
+}
+
+function scheduleSheetsSave() {
+  if (!gsSheetId || gsApplyingRemote) return;
+  clearTimeout(gsSaveTimer);
+  gsSaveTimer = setTimeout(gsSave, 1500);
+}
+
+function setSyncStatus(kind, label) {
+  const dot = document.getElementById("syncDot");
+  const lbl = document.getElementById("syncStatusLbl");
+  if (!dot || !lbl) return;
+  dot.className = `sync-dot ${kind}`;
+  lbl.textContent = label;
+}
+
+function isUserTyping() {
+  const el = document.activeElement;
+  return el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA");
+}
+
+function renderSyncPanel() {
+  const disconnected = document.getElementById("syncDisconnected");
+  const connected = document.getElementById("syncConnected");
+  if (!disconnected || !connected) return;
+  if (gsSheetId) {
+    disconnected.style.display = "none";
+    connected.style.display = "block";
+    document.getElementById("gsOpenLink").href = `https://docs.google.com/spreadsheets/d/${gsSheetId}`;
+  } else {
+    disconnected.style.display = "block";
+    connected.style.display = "none";
+  }
+}
+
+async function gsConnect(clientId, sheetId, interactive) {
+  const errEl = document.getElementById("gsError");
+  errEl.style.display = "none";
+  if (!clientId) {
+    errEl.textContent = "Cole o Client ID.";
+    errEl.style.display = "block";
+    return;
+  }
+  gsClientId = clientId;
+  try {
+    await loadGisScript();
+    gsTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: gsClientId,
+      scope: GS_SCOPE,
+      callback: "",
+    });
+    await gsGetToken(interactive !== false);
+    if (sheetId) {
+      gsSheetId = sheetId;
+      const ok = await gsLoad();
+      if (!ok) {
+        errEl.textContent = "Nao foi possivel ler essa planilha. Verifique o ID e as permissoes.";
+        errEl.style.display = "block";
+        gsSheetId = "";
+        return;
+      }
+    } else {
+      await gsCreateSheet();
+      await gsSave();
+    }
+    localStorage.setItem("agenda_gs_client", gsClientId);
+    localStorage.setItem("agenda_gs_sheet", gsSheetId);
+    renderSyncPanel();
+    startSyncPolling();
+  } catch (e) {
+    console.error("gsConnect", e);
+    errEl.textContent = `Erro ao conectar: ${e.message}`;
+    errEl.style.display = "block";
+  }
+}
+
+function gsDisconnect() {
+  if (!confirm("Desconectar desta planilha? Os dados continuam salvos neste navegador.")) return;
+  gsSheetId = "";
+  gsClientId = "";
+  gsAccessToken = "";
+  localStorage.removeItem("agenda_gs_client");
+  localStorage.removeItem("agenda_gs_sheet");
+  renderSyncPanel();
+}
+
+let gsPollInterval = null;
+function startSyncPolling() {
+  if (gsPollInterval) clearInterval(gsPollInterval);
+  gsPollInterval = setInterval(() => {
+    if (gsSheetId && !isUserTyping() && openAllocForms.size === 0) gsLoad();
+  }, 30000);
+}
+
+async function tryAutoReconnect() {
+  if (!gsClientId || !gsSheetId) return;
+  try {
+    await loadGisScript();
+    gsTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: gsClientId,
+      scope: GS_SCOPE,
+      callback: "",
+    });
+    await gsGetToken(false);
+    await gsLoad();
+    renderSyncPanel();
+    startSyncPolling();
+  } catch (e) {
+    console.warn("Reconexao automatica com Google Sheets falhou", e);
+    setSyncStatus("err", "Reconecte-se ao Google Sheets na aba Cadastro");
+  }
+}
 
 // --- Week handling (ISO week, key = "YYYY-WW") ---
 let currentWeekStart = getStartOfWeek(new Date());
@@ -298,6 +522,7 @@ function render() {
   renderFerias();
   renderFeriasResumo();
   renderDashboard();
+  renderSyncPanel();
   saveData();
 }
 
@@ -1043,4 +1268,13 @@ document.querySelectorAll(".tab-button").forEach((btn) => {
   };
 });
 
+document.getElementById("gsConnectBtn").onclick = () => {
+  const clientId = document.getElementById("gsClientId").value.trim();
+  const sheetId = document.getElementById("gsSheetId").value.trim();
+  gsConnect(clientId, sheetId, true);
+};
+document.getElementById("gsSyncNowBtn").onclick = () => gsLoad();
+document.getElementById("gsDisconnectBtn").onclick = gsDisconnect;
+
 render();
+tryAutoReconnect();

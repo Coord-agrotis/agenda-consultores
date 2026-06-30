@@ -497,6 +497,25 @@
     font-size: 13px;
   }
   .backup-row button:hover { background: var(--accent-light); }
+  #syncCard ol li { margin-bottom: 4px; }
+  #syncCard a { color: var(--accent); }
+  #syncCard code {
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: monospace;
+  }
+  .sync-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--border2);
+    display: inline-block;
+  }
+  .sync-dot.ok { background: #16a34a; }
+  .sync-dot.syncing { background: #d97706; animation: syncBlink 1s infinite; }
+  .sync-dot.err { background: var(--danger); }
+  @keyframes syncBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 </style>
 </head>
 <body>
@@ -601,6 +620,41 @@
         <button id="importBackupBtn">Importar backup (JSON)</button>
         <button id="exportCsv">Exportar alocacoes (CSV)</button>
         <input type="file" id="importBackupFile" accept=".json" style="display:none;">
+      </div>
+    </div>
+
+    <div class="card" id="syncCard">
+      <h2>Sincronizacao com Google Sheets</h2>
+      <div id="syncDisconnected">
+        <p class="empty-hint" style="margin-bottom:10px;">
+          Conecte a uma planilha do Google Sheets para que voce e seus colegas usem os mesmos dados, em qualquer computador.
+          Isso exige criar uma credencial gratuita no Google Cloud (uma unica vez):
+        </p>
+        <ol style="font-size:13px; color:var(--muted); margin:0 0 14px 18px; padding:0; line-height:1.7;">
+          <li>Acesse <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a>, crie um projeto (ou use um existente).</li>
+          <li>Em "APIs e servicos &gt; Biblioteca", ative a <strong>Google Sheets API</strong>.</li>
+          <li>Em "APIs e servicos &gt; Credenciais &gt; Criar credenciais &gt; ID do cliente OAuth", escolha tipo <strong>Aplicativo da Web</strong> e adicione a origem de onde voce abre este arquivo em "Origens JavaScript autorizadas" (ex: o link do Google Drive/hospedagem, ou <code>null</code> se for um arquivo local).</li>
+          <li>Cole o Client ID gerado abaixo e clique em Conectar. Sera pedida sua autorizacao do Google na primeira vez.</li>
+        </ol>
+        <div class="setup-row" style="align-items:center;">
+          <input id="gsClientId" type="text" placeholder="Client ID (ex: xxxx.apps.googleusercontent.com)">
+        </div>
+        <div class="setup-row" style="align-items:center;">
+          <input id="gsSheetId" type="text" placeholder="ID de uma planilha existente (opcional - deixe vazio para criar uma nova)">
+          <button id="gsConnectBtn">Conectar</button>
+        </div>
+        <p class="empty-hint" id="gsError" style="color:var(--danger); display:none;"></p>
+      </div>
+      <div id="syncConnected" style="display:none;">
+        <div class="filter-row" style="margin-bottom:10px;">
+          <span class="sync-dot" id="syncDot"></span>
+          <span id="syncStatusLbl" class="empty-hint">-</span>
+        </div>
+        <div class="backup-row">
+          <a id="gsOpenLink" href="#" target="_blank" class="empty-hint" style="align-self:center; padding:8px 14px; border:1px solid var(--border); border-radius:6px; background:var(--card); text-decoration:none; font-size:13px; color:var(--accent);">Abrir planilha</a>
+          <button id="gsSyncNowBtn">Sincronizar agora</button>
+          <button id="gsDisconnectBtn">Desconectar</button>
+        </div>
       </div>
     </div>
   </section>
